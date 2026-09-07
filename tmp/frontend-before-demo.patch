@@ -1,0 +1,13 @@
+diff --git a/src/app/index.tsx b/src/app/index.tsx
+index 8ec3e6f..bcb78d8 100644
+--- a/src/app/index.tsx
++++ b/src/app/index.tsx
+@@ -35,7 +35,7 @@ export default function HomeScreen() {
+         <ThemedView style={styles.heroSection}>
+           <AnimatedIcon />
+           <ThemedText type="title" style={styles.title}>
+-            Welcome to&nbsp;Expo
++            Hello
+           </ThemedText>
+         </ThemedView>
+ 
