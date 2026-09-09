@@ -7,6 +7,7 @@
     "expo": "~57.0.20",
     "expo-constants": "~57.0.17",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.6",
     "expo-font": "~57.0.3",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.4",
@@ -29,17 +30,19 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "prettier": "^3.9.6",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test:demo": "node --experimental-strip-types scripts/test-demo.mjs"
+    "test": "node --test scripts/test-app.cjs",
+    "format": "prettier --write src app.json docs scripts/test-app.cjs",
+    "build:web": "expo export --platform web",
+    "build:native": "expo export --platform android --platform ios --output-dir dist-native"
   },
   "private": true
 }
