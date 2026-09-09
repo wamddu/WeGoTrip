@@ -1,13 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  ImageBackground,
-  Linking,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   calculateSettlement,
   localDate,
@@ -28,7 +21,8 @@ import {
   Section,
   styles as s,
 } from "../../ui/components";
-import { cover, palette as p } from "../../ui/theme";
+import { palette as p } from "../../ui/theme";
+import { TravelCover } from "../../ui/travel-cover";
 import { tripHref } from "../home/home-screen";
 import { DateFilter, editHref, PartyFilter } from "./shared";
 import { useTrip } from "./trip-context";
@@ -52,12 +46,7 @@ export function OverviewSection() {
   )[0];
   return (
     <>
-      <ImageBackground
-        source={cover}
-        style={st.hero}
-        imageStyle={{ width: "100%", height: "100%", borderRadius: 22 }}
-      >
-        <View style={st.heroTint} />
+      <TravelCover style={st.hero} contentStyle={st.heroContent}>
         <Badge background={p.white}>
           {trip.archived
             ? "여행 종료"
@@ -75,7 +64,7 @@ export function OverviewSection() {
             />
           </View>
         </View>
-      </ImageBackground>
+      </TravelCover>
       <View style={st.stats}>
         <View style={[s.card, s.flex, { minWidth: 140 }]}>
           <Text style={s.small}>우리의 예산</Text>
@@ -424,14 +413,8 @@ export function PlacesSection() {
   );
 }
 const st = StyleSheet.create({
-  hero: {
-    minHeight: 221,
-    padding: 19,
-    borderRadius: 22,
-    overflow: "hidden",
-    justifyContent: "space-between",
-  },
-  heroTint: { ...StyleSheet.absoluteFill, backgroundColor: "#09355655" },
+  hero: { borderRadius: 22 },
+  heroContent: { padding: 19, gap: 30 },
   heroTitle: {
     color: p.white,
     fontWeight: "800",

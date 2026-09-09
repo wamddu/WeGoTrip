@@ -1,12 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  ImageBackground,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { money, shortDate, type Trip } from "../../domain/models";
 import { useTravel } from "../../state/travel-provider";
 import {
@@ -24,7 +18,8 @@ import {
   type IconName,
 } from "../../ui/components";
 import { Page } from "../../ui/shell";
-import { cover, palette as p } from "../../ui/theme";
+import { palette as p } from "../../ui/theme";
+import { TravelCover } from "../../ui/travel-cover";
 
 export function tripHref(tripId: string, section = "overview") {
   return `/trip/${tripId}/${section}` as const;
@@ -50,12 +45,7 @@ function TripCard({ trip }: { trip: Trip }) {
       onPress={() => router.push(tripHref(trip.id))}
       style={st.tripCard}
     >
-      <ImageBackground
-        source={cover}
-        style={st.tripImage}
-        imageStyle={{ width: "100%", height: "100%", borderRadius: 21 }}
-      >
-        <View style={st.imageTint} />
+      <TravelCover contentStyle={st.tripImage}>
         <View style={s.between}>
           <Badge background={p.white}>{status}</Badge>
           <Icon name="arrow" color={p.white} />
@@ -73,7 +63,7 @@ function TripCard({ trip }: { trip: Trip }) {
             <Text style={st.tripDates}>함께하는 {trip.memberIds.length}명</Text>
           </View>
         </View>
-      </ImageBackground>
+      </TravelCover>
     </Pressable>
   );
 }
@@ -283,8 +273,7 @@ const st = StyleSheet.create({
     marginBottom: 9,
   },
   tripCard: { borderRadius: 21, overflow: "hidden" },
-  tripImage: { height: 235, padding: 19, justifyContent: "space-between" },
-  imageTint: { ...StyleSheet.absoluteFill, backgroundColor: "#0C3F6A45" },
+  tripImage: { padding: 19, justifyContent: "space-between" },
   tripBottom: { paddingTop: 30 },
   tripTitle: {
     fontSize: 25,

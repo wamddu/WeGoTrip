@@ -1,7 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,7 +18,8 @@ import {
   styles as s,
 } from "../../ui/components";
 import { Frame } from "../../ui/shell";
-import { cover, palette as p } from "../../ui/theme";
+import { palette as p } from "../../ui/theme";
+import { TravelCover } from "../../ui/travel-cover";
 
 export default function AuthScreen() {
   const state = useTravel();
@@ -60,12 +60,7 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <ImageBackground
-            source={cover}
-            style={st.hero}
-            imageStyle={{ width: "100%", height: "100%" }}
-          >
-            <View style={st.heroTint} />
+          <TravelCover light contentStyle={st.hero}>
             <View style={st.brandRow}>
               <Icon name="plane" color={p.primary} size={27} />
               <Text style={st.brand}>
@@ -76,7 +71,7 @@ export default function AuthScreen() {
               함께 떠나는 여행,{"\n"}오래 남을 우리 이야기.
             </Text>
             <Text style={st.heroSub}>계획부터 정산까지, 한곳에서 가볍게.</Text>
-          </ImageBackground>
+          </TravelCover>
           <View style={st.panel}>
             <View style={[s.row, { marginBottom: 24 }]}>
               <Chip
@@ -157,8 +152,7 @@ export default function AuthScreen() {
   );
 }
 const st = StyleSheet.create({
-  hero: { height: 350, padding: 27, overflow: "hidden" },
-  heroTint: { ...StyleSheet.absoluteFill, backgroundColor: "#E3F6FF65" },
+  hero: { padding: 27, justifyContent: "flex-start" },
   brandRow: {
     flexDirection: "row",
     gap: 8,
@@ -184,7 +178,6 @@ const st = StyleSheet.create({
     backgroundColor: p.white,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    marginTop: -27,
     padding: 27,
     paddingBottom: 35,
   },

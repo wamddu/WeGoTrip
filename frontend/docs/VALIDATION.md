@@ -26,6 +26,12 @@
 
 브라우저 검증 중 입력한 데이터는 해당 브라우저의 로컬 저장소에만 남는다. 버전 관리하는 fixture에는 테스트 입력을 넣지 않았다.
 
+## 휴대폰 이미지 잘림 수정 검증
+
+로그인, 홈/내 여행 카드, 여행 개요의 고정 높이와 기본 `cover` 확대 표시를 공통 `TravelCover`로 교체했다. 실제 컨테이너 크기를 측정하고 원본 비율로 최소 높이를 계산하며 `contain`으로 이미지 전체를 표시한다. 텍스트가 길어지면 컨테이너가 늘어나고, 로그인 패널의 음수 여백도 제거해 이미지 하단을 가리지 않는다.
+
+브라우저의 실제 CSS 너비 320px와 390px에서 로그인, 홈, 여행 개요의 이미지 표시와 가로 넘침 없음을 확인했다. 너비 변경 후 이미지 크기가 갱신되며, 넓은 화면에서는 앱의 최대 너비 500px를 따른다. 타입 검사, Prettier 검사, 웹/Android/iOS Expo export 및 `git diff --check`를 통과했다. 실기기에서의 재검증은 하지 않았다.
+
 ## 검증 범위의 한계
 
 Android prebuild는 성공했지만 APK 생성은 실패했다. Windows 프로젝트 경로에 한글이 있어 Android Gradle Plugin의 경로 검사에서 거절되었고, 생성된 `android/gradle.properties`에 `android.overridePathCheck=true`를 적용한 뒤에도 `react-native-worklets` CMake/Clang 단계에서 한글 경로가 깨져 `WorkletsPCH.h`를 열지 못했다. 따라서 APK 빌드 성공으로 보고하지 않는다. SDK 36, Build Tools 36, NDK 27.1, CMake 3.22.1 설치까지 진행했다. 영어/숫자로 된 경로에 프로젝트와 의존성을 설치한 뒤 네이티브 빌드를 다시 검증해야 한다. 원본 프로젝트 경로는 변경하지 않았다.
