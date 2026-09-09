@@ -65,4 +65,8 @@ collection은 `parties`, `places`, `agenda`, `expenses`, `checklist`, `notices`,
 
 ## 후속 서비스
 
+`Place.coordinates`는 선택 필드이며 `{ latitude: number, longitude: number } | null`이다. 위도는 -90~~90, 경도는 -180~~180의 유한한 숫자이고 두 값이 모두 필요하다. `null`은 위치 삭제를 의미하며 필드가 없는 기존 응답도 읽을 수 있다. 기존 `item.save` 명령에 포함해 저장한다. 장소 검색 API를 연결할 때 검색 결과 좌표를 이 필드로 전달하면 일정 지도에 반영된다. 주소 변경 시 클라이언트는 좌표를 지우고 위치를 다시 확인하게 한다.
+
+현재 지도 배경 제공자는 `src/data/map-provider.ts`, 방문 순서 계산은 `src/domain/route.ts`, 표시 컴포넌트는 `src/ui/geographic-map.tsx`로 나뉜다. 도로 경로를 제공하는 API는 아직 호출하지 않는다.
+
 지도 제공자는 별도 PlaceSearch/Map 인터페이스, 영수증 OCR은 업로드→인식 결과 검토→기존 Expense 저장, 실시간 메시지/알림은 WebSocket 또는 SSE→재조회/상태 반영, GPS는 명시적 공유 시작·중지와 위치 갱신 시각으로 추가한다. 현재 어댑터가 이런 서비스를 호출한다고 가정하지 않는다.

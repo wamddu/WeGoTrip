@@ -26,6 +26,8 @@ import { TravelCover } from "../../ui/travel-cover";
 import { tripHref } from "../home/home-screen";
 import { DateFilter, editHref, PartyFilter } from "./shared";
 import { useTrip } from "./trip-context";
+import { buildDayRoute } from "../../domain/route";
+import { ScheduleMap } from "./schedule-map";
 
 export function OverviewSection() {
   const { trip: t, data } = useTrip();
@@ -178,71 +180,85 @@ export function OverviewSection() {
 export function ScheduleSection() {
   const { trip: t, date, partyId } = useTrip();
   const trip = t!;
-  const agenda = trip.agenda
-    .filter(
-      (a) =>
-        a.date === date &&
-        (!partyId || a.partyId === null || a.partyId === partyId),
-    )
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const [view, setView] = useState("일정표");
+  const { agenda } = buildDayRoute(trip, date, partyId);
   return (
     <>
       <DateFilter />
       <PartyFilter />
+      <View style={s.wrap}>
+        {["일정표", "지도 동선"].map((label) => (
+          <Chip
+            key={label}
+            title={label}
+            active={view === label}
+            onPress={() => setView(label)}
+          />
+        ))}
+      </View>
       <Section
         title={`${shortDate(date)}의 여행`}
         action="일정 추가"
         onPress={() => router.push(editHref(trip.id, "agenda"))}
       />
-      {agenda.map((a, i) => (
-        <Pressable
-          key={a.id}
-          accessibilityRole="button"
-          accessibilityLabel={`${a.title} 수정`}
-          onPress={() => router.push(editHref(trip.id, "agenda", a.id))}
-          style={st.agendaRow}
-        >
-          <View style={st.timeColumn}>
-            <Text style={st.time}>{a.startTime}</Text>
-            <Text style={s.small}>{a.endTime}</Text>
+      {view === "지도 동선" ? (
+        <ScheduleMap
+          key={`${date}:${partyId}`}
+          trip={trip}
+          date={date}
+          partyId={partyId}
+        />
+      ) : (
+        agenda.map((a, i) => (
+          <Pressable
+            key={a.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${a.title} 수정`}
+            onPress={() => router.push(editHref(trip.id, "agenda", a.id))}
+            style={st.agendaRow}
+          >
+            <View style={st.timeColumn}>
+              <Text style={st.time}>{a.startTime}</Text>
+              <Text style={s.small}>{a.endTime}</Text>
+              <View
+                style={[
+                  st.dot,
+                  { backgroundColor: a.partyId ? p.coral : p.primary },
+                ]}
+              />
+              {i < agenda.length - 1 && <View style={st.line} />}
+            </View>
             <View
               style={[
-                st.dot,
-                { backgroundColor: a.partyId ? p.coral : p.primary },
+                s.card,
+                s.flex,
+                a.partyId && {
+                  backgroundColor: "#FFF5F2",
+                  borderColor: "#FAE3DC",
+                },
               ]}
-            />
-            {i < agenda.length - 1 && <View style={st.line} />}
-          </View>
-          <View
-            style={[
-              s.card,
-              s.flex,
-              a.partyId && {
-                backgroundColor: "#FFF5F2",
-                borderColor: "#FAE3DC",
-              },
-            ]}
-          >
-            <Badge
-              background={a.partyId ? "#FFE4DD" : p.blueSoft}
-              color={a.partyId ? "#CB6253" : p.primary}
             >
-              {trip.parties.find((p) => p.id === a.partyId)?.name ??
-                "모두 함께"}
-            </Badge>
-            <Text style={s.strong}>{a.title}</Text>
-            <View style={s.row}>
-              <Icon name="pin" size={14} color={p.secondary} />
-              <Text style={[s.small, s.flex]}>
-                {trip.places.find((p) => p.id === a.placeId)?.name ??
-                  "장소 미정"}
-              </Text>
+              <Badge
+                background={a.partyId ? "#FFE4DD" : p.blueSoft}
+                color={a.partyId ? "#CB6253" : p.primary}
+              >
+                {trip.parties.find((p) => p.id === a.partyId)?.name ??
+                  "모두 함께"}
+              </Badge>
+              <Text style={s.strong}>{a.title}</Text>
+              <View style={s.row}>
+                <Icon name="pin" size={14} color={p.secondary} />
+                <Text style={[s.small, s.flex]}>
+                  {trip.places.find((p) => p.id === a.placeId)?.name ??
+                    "장소 미정"}
+                </Text>
+              </View>
+              {!!a.note && <Text style={s.small}>{a.note}</Text>}
             </View>
-            {!!a.note && <Text style={s.small}>{a.note}</Text>}
-          </View>
-        </Pressable>
-      ))}
-      {!agenda.length && (
+          </Pressable>
+        ))
+      )}
+      {view === "일정표" && !agenda.length && (
         <Empty
           title="아직 비어 있는 하루예요"
           description="함께할 일정을 하나씩 채워 볼까요?"
@@ -251,8 +267,10 @@ export function ScheduleSection() {
         />
       )}
       <Text style={[s.small, { marginTop: 16 }]}>
-        일정을 눌러 수정할 수 있어요. 파티를 선택해도 함께 합류하는 일정은
-        표시됩니다.
+        {view === "일정표"
+          ? "일정을 눌러 수정할 수 있어요. "
+          : "번호를 선택하면 일정 정보를 확인할 수 있어요. "}
+        파티를 선택해도 함께 합류하는 일정은 표시됩니다.
       </Text>
     </>
   );

@@ -25,6 +25,19 @@ const {
 } = require("../src/data/fixtures/workspace.ts");
 const { MockTravelRepository } = require("../src/data/mock-repository.ts");
 const { HttpTravelRepository } = require("../src/data/http-repository.ts");
+const {
+  buildDayRoute,
+  parseCoordinates,
+  validCoordinates,
+} = require("../src/domain/route.ts");
+const {
+  fitCamera,
+  screenPoint,
+  project,
+  unproject,
+  visibleTiles,
+} = require("../src/domain/map-projection.ts");
+const { addSeedCoordinates } = require("../src/data/migrations.ts");
 const seed = createSeedWorkspace;
 const save = (collection, item) => ({
   type: "item.save",
@@ -63,6 +76,170 @@ class MemoryStorage {
     this.values.delete(key);
   }
 }
+test("지도 좌표는 두 숫자와 범위를 검증하고 빈 값은 위치 삭제로 처리", () => {
+  assert.equal(parseCoordinates("", "  "), null);
+  assert.deepEqual(parseCoordinates("0", "-0.12"), {
+    latitude: 0,
+    longitude: -0.12,
+  });
+  for (const [lat, lon] of [
+    ["", "129"],
+    ["35", ""],
+    ["91", "129"],
+    ["35", "181"],
+    ["NaN", "129"],
+    ["0x20", "129"],
+  ])
+    assert.throws(() => parseCoordinates(lat, lon), /위도/);
+  for (const coordinates of [
+    { latitude: 91, longitude: 0 },
+    { latitude: 0, longitude: "129" },
+    { latitude: 0 },
+    { latitude: null, longitude: 0 },
+  ]) {
+    assert.equal(validCoordinates(coordinates), false);
+    assert.throws(
+      () =>
+        applyCommand(
+          seed(),
+          "jiwoo",
+          save("places", { ...seed().trips[0].places[0], coordinates }),
+        ),
+      /위도/,
+    );
+  }
+});
+test("날짜/파티별 지도는 공통 일정을 포함하고 다른 파티 사이를 연결하지 않음", () => {
+  const trip = seed().trips[0];
+  const snapshot = JSON.stringify(trip);
+  const route = buildDayRoute(trip, "2026-09-19", null);
+  assert.deepEqual(
+    route.agenda.map((a) => a.id),
+    ["a1", "a2", "a3", "a4", "a5"],
+  );
+  assert.equal(route.located.length, 5);
+  assert.ok(
+    !route.segments.some(
+      (s) => s.from.agenda.id === "a3" && s.to.agenda.id === "a4",
+    ),
+  );
+  assert.deepEqual(
+    route.segments.map((s) => `${s.from.agenda.id}-${s.to.agenda.id}`).sort(),
+    ["a1-a2", "a2-a3", "a2-a4", "a3-a5", "a4-a5"],
+  );
+  const cafe = buildDayRoute(trip, "2026-09-19", "cafe");
+  assert.deepEqual(
+    cafe.agenda.map((a) => a.id),
+    ["a1", "a2", "a3", "a5"],
+  );
+  assert.equal(JSON.stringify(trip), snapshot);
+  assert.equal(buildDayRoute(trip, "2026-09-21", null).stops.length, 0);
+  const nextDay = buildDayRoute(trip, "2026-09-20", null);
+  assert.equal(nextDay.missing.length, 1);
+  assert.equal(nextDay.segments.length, 0);
+});
+test("빠진 위치와 겹친 시간은 연결을 끊고 같은 장소의 재방문은 순서를 유지", () => {
+  const trip = seed().trips[0];
+  trip.places.find((p) => p.id === "p1").coordinates = null;
+  const route = buildDayRoute(trip, "2026-09-19", "cafe");
+  assert.deepEqual(
+    route.stops.map((s) => s.number),
+    [1, 2, 3, 4],
+  );
+  assert.deepEqual(
+    route.segments.map((s) => `${s.from.agenda.id}-${s.to.agenda.id}`),
+    ["a3-a5"],
+  );
+  trip.agenda.find((a) => a.id === "a3").endTime = "19:00";
+  assert.equal(buildDayRoute(trip, "2026-09-19", "cafe").segments.length, 0);
+  const repeated = buildDayRoute(seed().trips[0], "2026-09-19", "beach");
+  assert.equal(repeated.stops[1].place.id, repeated.stops[2].place.id);
+  assert.equal(repeated.stops[2].number, 3);
+});
+test("기존 저장 데이터에는 수정하지 않은 샘플 장소의 좌표만 보완", async () => {
+  const old = seed();
+  old.trips[0].places.forEach((p) => delete p.coordinates);
+  old.trips[0].places[1].coordinates = null;
+  old.trips[0].places[2].address = "사용자가 바꾼 주소";
+  old.trips[0].agenda[0].note = "보존해야 할 메모";
+  const snapshot = JSON.stringify(old);
+  const migrated = addSeedCoordinates(old);
+  assert.ok(validCoordinates(migrated.trips[0].places[0].coordinates));
+  assert.equal(migrated.trips[0].places[1].coordinates, null);
+  assert.equal(migrated.trips[0].places[2].coordinates, undefined);
+  assert.equal(migrated.trips[0].agenda[0].note, "보존해야 할 메모");
+  assert.equal(JSON.stringify(old), snapshot);
+  assert.deepEqual(addSeedCoordinates(migrated), migrated);
+  const storage = new MemoryStorage();
+  await storage.write("workspace-v1", snapshot);
+  const repo = new MockTravelRepository(storage);
+  await repo.signIn(SAMPLE_EMAIL);
+  const place = (await repo.load()).trips[0].places[0];
+  await repo.execute(
+    save("places", {
+      ...place,
+      coordinates: { latitude: 0, longitude: -73.2 },
+    }),
+  );
+  const restored = new MockTravelRepository(storage);
+  await restored.restoreSession();
+  assert.deepEqual((await restored.load()).trips[0].places[0].coordinates, {
+    latitude: 0,
+    longitude: -73.2,
+  });
+});
+test("지도 투영은 왕복 좌표를 보존하고 320px/390px에서 모든 위치를 화면 안에 맞춤", () => {
+  const coordinates = seed().trips[0].places.map((p) => p.coordinates);
+  for (const point of [
+    ...coordinates,
+    { latitude: 0, longitude: 0 },
+    { latitude: -40, longitude: -73 },
+  ]) {
+    const restored = unproject(project(point));
+    assert.ok(Math.abs(restored.latitude - point.latitude) < 1e-7);
+    assert.ok(Math.abs(restored.longitude - point.longitude) < 1e-7);
+  }
+  for (const width of [278, 348, 458]) {
+    const camera = fitCamera(coordinates, width, 280);
+    for (const point of coordinates) {
+      const pixel = screenPoint(point, camera, width, 280);
+      assert.ok(pixel.x >= 47 && pixel.x <= width - 47);
+      assert.ok(pixel.y >= 47 && pixel.y <= 233);
+    }
+    const tiles = visibleTiles(camera, width, 280);
+    assert.ok(tiles.length > 0 && tiles.length <= 9);
+    assert.ok(
+      tiles.every(
+        (t) =>
+          t.x >= 0 &&
+          t.x < 2 ** camera.zoom &&
+          t.y >= 0 &&
+          t.y < 2 ** camera.zoom,
+      ),
+    );
+  }
+});
+test("날짜 변경선과 단일 장소에서도 유한한 줌과 유효한 지도 타일 사용", () => {
+  const points = [
+    { latitude: 10, longitude: 179.9 },
+    { latitude: 10, longitude: -179.9 },
+  ];
+  const camera = fitCamera(points, 300, 280);
+  assert.ok(camera.zoom > 7);
+  points.forEach((point) =>
+    assert.ok(Math.abs(screenPoint(point, camera, 300, 280).x - 150) < 110),
+  );
+  assert.equal(fitCamera([points[0]], 300, 280).zoom, 16);
+  for (const latitude of [-90, 90]) {
+    const polar = fitCamera([{ latitude, longitude: 180 }], 300, 280);
+    assert.ok(Number.isFinite(polar.center.y));
+    assert.ok(
+      visibleTiles(polar, 300, 280).every(
+        (t) => t.y >= 0 && t.y < 2 ** polar.zoom,
+      ),
+    );
+  }
+});
 test("날짜 검증: 윤년, 잘못된 달력 날짜, 역순, 90일 한도", () => {
   assert.deepEqual(datesBetween("2024-02-28", "2024-03-01"), [
     "2024-02-28",

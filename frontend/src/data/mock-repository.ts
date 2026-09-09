@@ -7,6 +7,7 @@ import {
 } from "../domain/models";
 import type { KeyValueStorage, TravelRepository } from "./contracts";
 import { createSeedWorkspace, SAMPLE_EMAIL } from "./fixtures/workspace";
+import { addSeedCoordinates } from "./migrations";
 
 const emailValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 export class MockTravelRepository implements TravelRepository {
@@ -27,7 +28,7 @@ export class MockTravelRepository implements TravelRepository {
         throw new Error(
           "저장된 데이터 버전을 읽을 수 없어요. 데이터를 보존한 채 다시 시도해 주세요.",
         );
-      return data;
+      return addSeedCoordinates(data);
     }
     const data = createSeedWorkspace();
     await this.storage.write("workspace-v1", JSON.stringify(data));

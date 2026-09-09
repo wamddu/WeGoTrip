@@ -77,6 +77,7 @@ export function createSeedWorkspace(): Workspace {
             name: "해운대 해수욕장",
             category: "볼거리",
             address: "부산 해운대구 해운대해변로 264",
+            coordinates: { latitude: 35.1587, longitude: 129.1604 },
             note: "바다를 따라 여유롭게 걸어요.",
           },
           {
@@ -84,6 +85,7 @@ export function createSeedWorkspace(): Workspace {
             name: "광안리 해수욕장",
             category: "볼거리",
             address: "부산 수영구 광안해변로 219",
+            coordinates: { latitude: 35.1532, longitude: 129.1186 },
             note: "해가 지면 광안대교 야경 보기.",
           },
           {
@@ -91,6 +93,7 @@ export function createSeedWorkspace(): Workspace {
             name: "전포 카페거리",
             category: "카페",
             address: "부산 부산진구 전포대로 일대",
+            coordinates: { latitude: 35.1543, longitude: 129.0634 },
             note: "마음에 드는 카페를 함께 골라요.",
           },
           {
@@ -98,6 +101,7 @@ export function createSeedWorkspace(): Workspace {
             name: "부산역",
             category: "교통",
             address: "부산 동구 중앙대로 206",
+            coordinates: { latitude: 35.1152, longitude: 129.0414 },
             note: "도착 후 1번 출구에서 모이기.",
           },
         ],

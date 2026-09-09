@@ -20,6 +20,9 @@ import {
 } from "../../ui/components";
 import { Confirm, Page } from "../../ui/shell";
 import { useTrip } from "./trip-context";
+import { parseCoordinates, validCoordinates } from "../../domain/route";
+import { GeographicMap } from "../../ui/geographic-map";
+import { palette as p } from "../../ui/theme";
 
 type Kind = Exclude<Collection, "messages"> | "settings";
 const titles: Record<Kind, string> = {
@@ -115,6 +118,12 @@ function Editor({
     amount: string("amount"),
     budget: string("budget", String(trip.budget)),
     address: string("address"),
+    latitude: validCoordinates(initial.coordinates)
+      ? String(initial.coordinates.latitude)
+      : "",
+    longitude: validCoordinates(initial.coordinates)
+      ? String(initial.coordinates.longitude)
+      : "",
     category: string("category", "볼거리"),
     note: string("note"),
     body: string("body"),
@@ -147,9 +156,24 @@ function Editor({
   const [archived, setArchived] = useState(trip.archived);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const previewCoordinates = {
+    latitude: Number(form.latitude),
+    longitude: Number(form.longitude),
+  };
+  const hasCoordinates =
+    !!form.latitude.trim() &&
+    !!form.longitude.trim() &&
+    validCoordinates(previewCoordinates);
   const people = data!.users.filter((user) => trip.memberIds.includes(user.id));
   const patch = (key: string, value: string) =>
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === "address" && value !== current.address
+        ? { latitude: "", longitude: "" }
+        : {}),
+    }));
   const field = (
     key: string,
     title: string,
@@ -230,6 +254,7 @@ function Editor({
               id,
               name: form.title.trim(),
               address: form.address.trim(),
+              coordinates: parseCoordinates(form.latitude, form.longitude),
               category: form.category,
               note: form.note,
             },
@@ -425,6 +450,69 @@ function Editor({
       {kind === "places" && (
         <>
           {field("address", "주소")}
+          <Section title="지도 위치 (선택)" />
+          <Text style={[s.small, { marginBottom: 12 }]}>
+            지도를 눌러 위치를 선택하거나 위도·경도를 입력해 주세요. 주소를
+            바꾸면 위치도 다시 선택해 주세요.
+          </Text>
+          <Button
+            title={mapOpen ? "위치 지도 접기" : "지도에서 위치 선택"}
+            secondary
+            icon="map"
+            onPress={() => setMapOpen((value) => !value)}
+          />
+          {mapOpen && (
+            <View style={{ marginVertical: 12 }}>
+              <GeographicMap
+                initialCenter={
+                  trip.places.find((place) =>
+                    validCoordinates(place.coordinates),
+                  )?.coordinates ?? { latitude: 36.3, longitude: 127.8 }
+                }
+                markers={
+                  hasCoordinates
+                    ? [
+                        {
+                          id: "place",
+                          label: "1",
+                          title: form.title || "선택한 장소",
+                          coordinates: previewCoordinates,
+                          color: p.primary,
+                        },
+                      ]
+                    : []
+                }
+                onPick={(coordinates) =>
+                  setForm((current) => ({
+                    ...current,
+                    latitude: coordinates.latitude.toFixed(6),
+                    longitude: coordinates.longitude.toFixed(6),
+                  }))
+                }
+              />
+            </View>
+          )}
+          <View style={{ marginTop: 12 }}>
+            {field("latitude", "위도", "예: 35.1587", {
+              keyboardType: "numbers-and-punctuation",
+            })}
+            {field("longitude", "경도", "예: 129.1604", {
+              keyboardType: "numbers-and-punctuation",
+            })}
+          </View>
+          {hasCoordinates && (
+            <Button
+              title="위치 지우기"
+              secondary
+              onPress={() =>
+                setForm((current) => ({
+                  ...current,
+                  latitude: "",
+                  longitude: "",
+                }))
+              }
+            />
+          )}
           <Section title="장소 분류" />
           <View style={[s.wrap, { marginBottom: 20 }]}>
             {["음식점", "카페", "숙소", "볼거리", "교통", "기타"].map((v) => (

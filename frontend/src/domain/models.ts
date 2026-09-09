@@ -12,12 +12,17 @@ export interface Party {
   startTime: string;
   endTime: string;
 }
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
 export interface Place {
   id: string;
   name: string;
   category: string;
   address: string;
   note: string;
+  coordinates?: Coordinates | null;
 }
 export interface Agenda {
   id: string;

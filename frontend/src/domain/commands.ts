@@ -7,6 +7,7 @@ import {
   type TripInput,
   type Workspace,
 } from "./models";
+import { validCoordinates } from "./route";
 
 function ensure(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -200,6 +201,11 @@ export function applyCommand(
       ensure(
         text(command.item.name) && text(command.item.address, 300),
         "장소 이름과 주소를 입력해 주세요.",
+      );
+      ensure(
+        command.item.coordinates == null ||
+          validCoordinates(command.item.coordinates),
+        "장소의 위도와 경도를 확인해 주세요.",
       );
       section = "places";
     } else if (collection === "expenses") {
