@@ -1,5 +1,6 @@
 package com.travel.travelbackend.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -9,10 +10,11 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-import io.jsonwebtoken.Claims;
-
 @Component
 public class JwtProvider {
+
+    private static final String ISSUER = "wegotrip";
+    private static final String AUDIENCE = "wegotrip-api";
 
     private final SecretKey key;
     private final long accessTokenExpiration;
@@ -32,6 +34,10 @@ public class JwtProvider {
         long now = System.currentTimeMillis();
 
         return Jwts.builder()
+                .issuer(ISSUER)
+                .audience()
+                .add(AUDIENCE)
+                .and()
                 .subject(String.valueOf(userId))
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + accessTokenExpiration * 1000))
@@ -45,6 +51,10 @@ public class JwtProvider {
         long now = System.currentTimeMillis();
 
         return Jwts.builder()
+                .issuer(ISSUER)
+                .audience()
+                .add(AUDIENCE)
+                .and()
                 .subject(String.valueOf(userId))
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + refreshTokenExpiration * 1000))
@@ -65,6 +75,8 @@ public class JwtProvider {
     public Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(key)
+                .requireIssuer(ISSUER)
+                .requireAudience(AUDIENCE)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
