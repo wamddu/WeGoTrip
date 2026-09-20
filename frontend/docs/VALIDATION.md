@@ -45,3 +45,12 @@
 Android prebuild는 성공했지만 APK 생성은 실패했다. Windows 프로젝트 경로에 한글이 있어 Android Gradle Plugin의 경로 검사에서 거절되었고, 생성된 `android/gradle.properties`에 `android.overridePathCheck=true`를 적용한 뒤에도 `react-native-worklets` CMake/Clang 단계에서 한글 경로가 깨져 `WorkletsPCH.h`를 열지 못했다. 따라서 APK 빌드 성공으로 보고하지 않는다. SDK 36, Build Tools 36, NDK 27.1, CMake 3.22.1 설치까지 진행했다. 영어/숫자로 된 경로에 프로젝트와 의존성을 설치한 뒤 네이티브 빌드를 다시 검증해야 한다. 원본 프로젝트 경로는 변경하지 않았다.
 
 실제 인증 서버와의 통신은 진행하지 않았다. HTTP 어댑터는 가짜 fetch 응답으로 계약을 검증했다. 외부 지도 서비스 결과, 공유 앱으로 실제 발송, 기기 간 실시간 메시지·푸시·GPS·OCR은 검증 대상이 아니다. 연결된 Android 실기기/에뮬레이터는 없으며 iOS 설치 검증도 진행하지 않았다.
+
+## 2026-09-19 USER/Auth 연동 검증
+
+- frontend: typecheck, 27 tests, web/Android/iOS export 통과. 네이티브는 JS 번들 검증이며 실기기 설치 테스트가 아니다.
+- backend: 총 15 tests(지도 3, context 1, USER/Auth 11) 통과. 인증 CORS 및 실제 발급 JWT의 로그아웃 무효화 포함.
+- 브라우저: 실제 로그인, 이름 수정, 약관 내역 2건, 계좌 저장 후 입력 초기화 및 마스킹 표시 확인.
+- 실제 MySQL/API: 테스트 회원 2번만 사용하여 설정 저장/재조회, 비밀번호 변경 후 이전 JWT 401, 재로그인, 재인증 후 탈퇴, 탈퇴 후 보호 API 403 및 로그인 401 확인.
+- 검증용 회원은 WITHDRAWN 상태로 남았으며 다른 회원/기기 데이터는 테스트 대상으로 사용하지 않았다.
+- 기존 기기 1건의 token_hash 누락은 003 마이그레이션으로 복구했다.

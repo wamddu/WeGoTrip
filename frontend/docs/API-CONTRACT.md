@@ -1,6 +1,6 @@
 # 연결할 API 계약
 
-이 문서는 새 프런트엔드의 **제안 계약**이다. 저장소의 현재 Java 백엔드는 이 계약을 구현하지 않았으며 `http` 모드로 바꾸기만 해서는 전체 서비스가 동작하지 않는다.
+이 문서는 미래 여행 서버용 **제안 계약**이다. 현재 http 모드는 [USER/Auth 계약](USER-API.md)을 사용하며 계정 API만 실제 서버에 연결한다. 아래 `/auth`, `/workspace`, `/commands` 어댑터는 현재 선택되지 않는다.
 
 `.env.local`에서 `EXPO_PUBLIC_DATA_SOURCE=http`, `EXPO_PUBLIC_API_URL=https://your-server.example/api`를 설정하고 Metro를 재시작한다. Android 에뮬레이터에서 PC 서버는 일반적으로 `10.0.2.2`, 실기기에서는 접근 가능한 PC 주소를 사용한다. 운영 서버는 HTTPS를 사용한다. 공개 환경변수에 API 비밀 키를 넣지 않는다.
 
@@ -67,6 +67,6 @@ collection은 `parties`, `places`, `agenda`, `expenses`, `checklist`, `notices`,
 
 `Place.coordinates`는 선택 필드이며 `{ latitude: number, longitude: number } | null`이다. 위도는 -90~~90, 경도는 -180~~180의 유한한 숫자이고 두 값이 모두 필요하다. `null`은 위치 삭제를 의미하며 필드가 없는 기존 응답도 읽을 수 있다. 기존 `item.save` 명령에 포함해 저장한다. 장소 검색 API를 연결할 때 검색 결과 좌표를 이 필드로 전달하면 일정 지도에 반영된다. 주소 변경 시 클라이언트는 좌표를 지우고 위치를 다시 확인하게 한다.
 
-현재 지도 배경 제공자는 `src/data/map-provider.ts`, 방문 순서 계산은 `src/domain/route.ts`, 표시 컴포넌트는 `src/ui/geographic-map.tsx`로 나뉜다. 도로 경로를 제공하는 API는 아직 호출하지 않는다.
+장소 검색과 Google 지도 프록시는 `src/data/place-search.ts`, 방문 순서 계산은 `src/domain/route.ts`, 표시 컴포넌트는 `src/ui/geographic-map.tsx`로 나뉜다. `Place.googlePlaceId?: string`에 선택한 Google 장소 ID를 저장한다. `GET /api/maps/places/search?query=...`는 `{ id, name, address, coordinates, category }[]`, `GET /api/maps/image?latitude=...&longitude=...&zoom=...&width=...`는 지도 이미지를 반환한다. 도로 경로를 제공하는 API는 아직 호출하지 않는다.
 
-지도 제공자는 별도 PlaceSearch/Map 인터페이스, 영수증 OCR은 업로드→인식 결과 검토→기존 Expense 저장, 실시간 메시지/알림은 WebSocket 또는 SSE→재조회/상태 반영, GPS는 명시적 공유 시작·중지와 위치 갱신 시각으로 추가한다. 현재 어댑터가 이런 서비스를 호출한다고 가정하지 않는다.
+장소 검색과 지도 이미지는 여행 데이터 저장소와 독립적으로 백엔드 지도 API를 호출한다. 영수증 OCR은 업로드→인식 결과 검토→기존 Expense 저장, 실시간 메시지/알림은 WebSocket 또는 SSE→재조회/상태 반영, GPS는 명시적 공유 시작·중지와 위치 갱신 시각으로 추가한다. 지도 외 서비스는 아직 연결하지 않았다.

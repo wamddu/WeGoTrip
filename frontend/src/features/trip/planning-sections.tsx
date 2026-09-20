@@ -28,6 +28,7 @@ import { DateFilter, editHref, PartyFilter } from "./shared";
 import { useTrip } from "./trip-context";
 import { buildDayRoute } from "../../domain/route";
 import { ScheduleMap } from "./schedule-map";
+import { SchedulePager } from "./schedule-pager";
 
 export function OverviewSection() {
   const { trip: t, data } = useTrip();
@@ -178,14 +179,10 @@ export function OverviewSection() {
   );
 }
 export function ScheduleSection() {
-  const { trip: t, date, partyId } = useTrip();
-  const trip = t!;
   const [view, setView] = useState("일정표");
-  const { agenda } = buildDayRoute(trip, date, partyId);
   return (
     <>
       <DateFilter />
-      <PartyFilter />
       <View style={s.wrap}>
         {["일정표", "지도 동선"].map((label) => (
           <Chip
@@ -196,18 +193,48 @@ export function ScheduleSection() {
           />
         ))}
       </View>
+      <SchedulePager>
+        {(partyId, active) => (
+          <SchedulePage partyId={partyId} view={view} active={active} />
+        )}
+      </SchedulePager>
+    </>
+  );
+}
+
+function SchedulePage({
+  partyId,
+  view,
+  active,
+}: {
+  partyId: string | null;
+  view: string;
+  active: boolean;
+}) {
+  const { trip: t, date } = useTrip();
+  // The shared page shows only common events in both the list and route map.
+  const trip = partyId
+    ? t!
+    : { ...t!, agenda: t!.agenda.filter((item) => !item.partyId) };
+  const { agenda } = buildDayRoute(trip, date, partyId);
+  return (
+    <>
       <Section
         title={`${shortDate(date)}의 여행`}
         action="일정 추가"
         onPress={() => router.push(editHref(trip.id, "agenda"))}
       />
       {view === "지도 동선" ? (
-        <ScheduleMap
-          key={`${date}:${partyId}`}
-          trip={trip}
-          date={date}
-          partyId={partyId}
-        />
+        active ? (
+          <ScheduleMap
+            key={`${date}:${partyId}`}
+            trip={trip}
+            date={date}
+            partyId={partyId}
+          />
+        ) : (
+          <View style={{ height: 326 }} />
+        )
       ) : (
         agenda.map((a, i) => (
           <Pressable
@@ -270,7 +297,7 @@ export function ScheduleSection() {
         {view === "일정표"
           ? "일정을 눌러 수정할 수 있어요. "
           : "번호를 선택하면 일정 정보를 확인할 수 있어요. "}
-        파티를 선택해도 함께 합류하는 일정은 표시됩니다.
+        팀별 화면에도 함께 합류하는 일정은 표시됩니다.
       </Text>
     </>
   );

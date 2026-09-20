@@ -23,6 +23,7 @@ export interface Place {
   address: string;
   note: string;
   coordinates?: Coordinates | null;
+  googlePlaceId?: string;
 }
 export interface Agenda {
   id: string;

@@ -11,6 +11,7 @@ import { repository } from "../data/repository";
 import type { Command, Session, Workspace } from "../domain/models";
 
 type TravelContext = {
+  userApi?: import("../data/user-api").UserApi;
   session: Session | null;
   data: Workspace | null;
   loading: boolean;
@@ -36,13 +37,38 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const [error, setError] = useState("");
   const lock = useRef(false);
   const revision = useRef(0);
+  useEffect(() => {
+    const api = repository.userApi;
+    if (!api) return;
+    api.onExpired = () => {
+      revision.current++;
+      setSession(null);
+      setData(null);
+      setError("로그인이 만료되었어요. 다시 로그인해 주세요.");
+    };
+    return () => {
+      api.onExpired = undefined;
+    };
+  }, []);
   const refresh = useCallback(async () => {
     if (lock.current) return;
     const requestRevision = ++revision.current;
     setError("");
     try {
       const next = await repository.load();
-      if (revision.current === requestRevision) setData(next);
+      if (revision.current === requestRevision) {
+        setData(next);
+        setSession((current) =>
+          current
+            ? {
+                ...current,
+                user:
+                  next.users.find((u) => u.id === current.user.id) ??
+                  current.user,
+              }
+            : null,
+        );
+      }
     } catch (e) {
       if (revision.current === requestRevision)
         setError(
@@ -56,10 +82,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
       try {
         const saved = await repository.restoreSession();
         if (!active) return;
-        setSession(saved);
         if (saved) {
           const next = await repository.load();
-          if (active) setData(next);
+          if (active) {
+            setSession(saved);
+            setData(next);
+          }
         }
       } catch (e) {
         if (active)
@@ -121,6 +149,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
   return (
     <Context.Provider
       value={{
+        userApi: repository.userApi,
         session,
         data,
         loading,

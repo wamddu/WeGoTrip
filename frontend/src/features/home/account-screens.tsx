@@ -17,6 +17,7 @@ import {
 import { Confirm, Page } from "../../ui/shell";
 import { palette as p } from "../../ui/theme";
 import { tripHref } from "./home-screen";
+import { UserSettings } from "./user-settings";
 
 export function FriendsScreen() {
   const { data, session, execute, busy } = useTravel();
@@ -111,13 +112,14 @@ export function ProfileScreen() {
         <Text style={s.body}>
           {mode === "mock"
             ? "로컬 데이터 모드가 활성화되어 있어요. 변경한 내용은 이 기기에 저장됩니다. 다른 기기와는 아직 동기화되지 않아요."
-            : "서버 데이터 모드가 활성화되어 있어요."}
+            : "회원 정보는 서버에 저장됩니다. 여행 데이터는 계정별로 이 기기에 저장되며 다른 기기와 동기화되지 않아요."}
         </Text>
         <Text style={s.small}>
           일정의 지도 동선에서 방문 순서를 확인할 수 있어요. 실시간 위치·영수증
           인식·AI 도우미는 후속 연결 기능입니다.
         </Text>
       </Card>
+      {mode === "http" && <UserSettings />}
       <ErrorMessage message={error} />
       <View style={{ marginTop: 25 }}>
         <Button

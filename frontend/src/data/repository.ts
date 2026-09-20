@@ -1,7 +1,8 @@
-import { HttpTravelRepository } from "./http-repository";
+import { UserTravelRepository } from "./user-travel-repository";
 import { MockTravelRepository } from "./mock-repository";
 import { storage } from "./storage";
 import type { TravelRepository } from "./contracts";
+import { createRefreshStorage } from "./refresh-storage";
 if (
   process.env.EXPO_PUBLIC_DATA_SOURCE &&
   !["mock", "http"].includes(process.env.EXPO_PUBLIC_DATA_SOURCE)
@@ -10,5 +11,11 @@ if (
 }
 export const repository: TravelRepository =
   process.env.EXPO_PUBLIC_DATA_SOURCE === "http"
-    ? new HttpTravelRepository(process.env.EXPO_PUBLIC_API_URL ?? "")
+    ? new UserTravelRepository(
+        process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8080/api",
+        storage,
+        createRefreshStorage(
+          process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8080/api",
+        ),
+      )
     : new MockTravelRepository(storage);

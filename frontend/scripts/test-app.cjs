@@ -25,6 +25,61 @@ const {
 } = require("../src/data/fixtures/workspace.ts");
 const { MockTravelRepository } = require("../src/data/mock-repository.ts");
 const { HttpTravelRepository } = require("../src/data/http-repository.ts");
+const { searchPlaces } = require("../src/data/place-search.ts");
+
+test("장소 검색은 한글 검색어를 인코딩하고 잘못된 위치 결과를 제외", async (t) => {
+  const original = global.fetch;
+  t.after(() => {
+    global.fetch = original;
+  });
+  let requestedUrl;
+  const place = {
+    id: "google-hotel",
+    name: "호텔",
+    address: "부산",
+    category: "숙소",
+    coordinates: { latitude: 35, longitude: 129 },
+  };
+  global.fetch = async (url) => {
+    requestedUrl = url;
+    return new Response(
+      JSON.stringify([
+        place,
+        { ...place, coordinates: { latitude: 999, longitude: 129 } },
+      ]),
+    );
+  };
+  assert.deepEqual(await searchPlaces(" 부산 호텔 "), [place]);
+  assert.ok(requestedUrl.endsWith("query=" + encodeURIComponent("부산 호텔")));
+  await assert.rejects(searchPlaces(" "), /검색어/);
+  global.fetch = async () =>
+    new Response(JSON.stringify({ message: "서비스 준비 중" }), {
+      status: 503,
+    });
+  await assert.rejects(searchPlaces("호텔"), /서비스 준비 중/);
+});
+
+test("검색한 장소를 저장하면 이름·주소·좌표·Google 장소 ID가 유지", () => {
+  const item = {
+    id: "searched-place",
+    name: "호텔",
+    address: "부산",
+    category: "숙소",
+    note: "예약 확인",
+    coordinates: { latitude: 35, longitude: 129 },
+    googlePlaceId: "google-hotel",
+  };
+  const next = applyCommand(createSeedWorkspace(), "jiwoo", {
+    type: "item.save",
+    tripId: "busan",
+    collection: "places",
+    item,
+  });
+  assert.deepEqual(
+    next.trips[0].places.find((place) => place.id === item.id),
+    item,
+  );
+});
 const {
   buildDayRoute,
   parseCoordinates,
@@ -576,4 +631,387 @@ test("HTTP 어댑터의 인증 헤더, 명령 응답, 오류 처리와 로그아
   await assert.rejects(repo.load(), /여행 권한 없음/);
   await repo.signOut();
   assert.equal(calls.length, 4);
+});
+
+test("USER API unwraps envelopes, sends bearer and preserves PATCH null semantics", async (t) => {
+  const { UserApi, ApiError } = require("../src/data/user-api.ts");
+  const original = global.fetch;
+  t.after(() => {
+    global.fetch = original;
+  });
+  const api = new UserApi("http://localhost:8080/api/");
+  api.token = "test-token";
+  let sent;
+  global.fetch = async (url, options) => {
+    sent = { url, ...options };
+    return new Response(
+      JSON.stringify({ code: "SUCCESS", data: { id: "1", name: "수정" } }),
+    );
+  };
+  assert.equal((await api.updateProfile({ name: "수정" })).name, "수정");
+  assert.equal(sent.url, "http://localhost:8080/api/v1/users/me");
+  assert.equal(sent.headers.Authorization, "Bearer test-token");
+  assert.deepEqual(JSON.parse(sent.body), { name: "수정" });
+  await api.updateProfile({ bankAccountNumber: null });
+  assert.deepEqual(JSON.parse(sent.body), { bankAccountNumber: null });
+  global.fetch = async () =>
+    new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "만료" }), {
+      status: 401,
+    });
+  await assert.rejects(
+    api.me(),
+    (e) => e instanceof ApiError && e.status === 401,
+  );
+  api.token = "test-token";
+  await assert.rejects(api.logout());
+  assert.equal(api.token, null);
+});
+
+test("Server accounts isolate local travel and never persist bearer credentials", async (t) => {
+  const {
+    UserTravelRepository,
+  } = require("../src/data/user-travel-repository.ts");
+  const saved = new Map();
+  const storage = {
+    read: async (k) => saved.get(k) ?? null,
+    write: async (k, v) => saved.set(k, v),
+    remove: async (k) => saved.delete(k),
+  };
+  const original = global.fetch;
+  t.after(() => {
+    global.fetch = original;
+  });
+  let id = "1";
+  global.fetch = async (url) =>
+    new Response(
+      JSON.stringify({
+        code: "SUCCESS",
+        data: url.endsWith("/login")
+          ? { accessToken: "private-token" }
+          : url.endsWith("/logout")
+            ? null
+            : { id, name: "테스트", email: "test@example.com" },
+      }),
+    );
+  const repo = new UserTravelRepository("http://localhost:8080/api", storage);
+  await repo.signIn("test@example.com", "password");
+  assert.equal((await repo.load()).users[0].id, "1");
+  saved.set(
+    "server-user-1-workspace-v1",
+    JSON.stringify({
+      version: 1,
+      users: [],
+      trips: [{ id: "owned" }],
+      friendships: {},
+      notifications: [],
+    }),
+  );
+  await repo.signOut();
+  id = "2";
+  await repo.signIn("other@example.com", "password");
+  assert.deepEqual((await repo.load()).trips, []);
+  assert.ok(
+    [...saved.values()].every((value) => !value.includes("private-token")),
+  );
+  assert.equal(
+    await new UserTravelRepository(
+      "http://localhost:8080/api",
+      storage,
+    ).restoreSession(),
+    null,
+  );
+});
+
+test("Consent list matches nested server contract and failed reauthentication preserves the session", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const original = global.fetch;
+  t.after(() => {
+    global.fetch = original;
+  });
+  const api = new UserApi("http://localhost:8080/api");
+  api.token = "existing";
+  global.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        code: "SUCCESS",
+        data: {
+          consents: [
+            {
+              id: "2",
+              consentType: "PRIVACY_POLICY",
+              version: "1.0",
+              agreedAt: "2026-09-16T00:00:00Z",
+            },
+          ],
+        },
+      }),
+    );
+  assert.equal((await api.consents()).length, 1);
+  global.fetch = async (url, options) => {
+    assert.equal(options.headers.Authorization, undefined);
+    return new Response(
+      JSON.stringify({
+        code: "INVALID_CREDENTIALS",
+        message: "잘못된 비밀번호",
+      }),
+      { status: 401 },
+    );
+  };
+  await assert.rejects(api.login("test@example.com", "wrong"));
+  assert.equal(api.token, "existing");
+  let expired = false;
+  api.onExpired = () => {
+    expired = true;
+  };
+  global.fetch = async () =>
+    new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "만료" }), {
+      status: 401,
+    });
+  await assert.rejects(api.me());
+  assert.equal(api.token, null);
+  assert.equal(expired, true);
+});
+
+test("Concurrent expired requests rotate once and retry with the new access token", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  let stored = "refresh-old",
+    rotations = 0,
+    attempts = 0;
+  const store = {
+    kind: "NATIVE",
+    read: async () => stored,
+    write: async (value) => {
+      stored = value;
+    },
+    clear: async () => {
+      stored = null;
+    },
+  };
+  const api = new UserApi("http://test/api", store);
+  api.token = "expired";
+  global.fetch = async (url, options) => {
+    if (url.endsWith("/tokens/refresh")) {
+      rotations++;
+      assert.equal(options.headers.Authorization, undefined);
+      assert.equal(JSON.parse(options.body).refreshToken, "refresh-old");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return new Response(
+        JSON.stringify({
+          code: "SUCCESS",
+          data: { accessToken: "new-access", refreshToken: "refresh-new" },
+        }),
+      );
+    }
+    attempts++;
+    return options.headers.Authorization === "Bearer expired"
+      ? new Response(
+          JSON.stringify({ code: "UNAUTHORIZED", message: "expired" }),
+          { status: 401 },
+        )
+      : new Response(JSON.stringify({ code: "SUCCESS", data: { id: "1" } }));
+  };
+  await Promise.all([api.me(), api.settings(), api.me()]);
+  assert.equal(rotations, 1);
+  assert.equal(attempts, 6);
+  assert.equal(stored, "refresh-new");
+});
+
+test("Restart restores session through refresh and logout removes durable credentials", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  let stored = "persisted";
+  const store = {
+    kind: "NATIVE",
+    read: async () => stored,
+    write: async (value) => {
+      stored = value;
+    },
+    clear: async () => {
+      stored = null;
+    },
+  };
+  global.fetch = async (url, options) => {
+    assert.equal(options.headers.Authorization, undefined);
+    if (url.endsWith("/logout")) {
+      assert.equal(JSON.parse(options.body).refreshToken, "rotated");
+      return new Response(JSON.stringify({ code: "SUCCESS", data: null }));
+    }
+    return new Response(
+      JSON.stringify({
+        code: "SUCCESS",
+        data: { accessToken: "access", refreshToken: "rotated" },
+      }),
+    );
+  };
+  const api = new UserApi("http://test/api", store);
+  assert.equal(await api.restore(), true);
+  assert.equal(api.token, "access");
+  await api.logout();
+  assert.equal(stored, null);
+  assert.equal(api.token, null);
+  assert.equal(await new UserApi("http://test/api", store).restore(), false);
+});
+
+test("Ambiguous refresh failures are not retried and clear the consumed credential", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  let stored = "old",
+    calls = 0,
+    expired = 0;
+  const api = new UserApi("http://test/api", {
+    kind: "NATIVE",
+    read: async () => stored,
+    write: async (v) => {
+      stored = v;
+    },
+    clear: async () => {
+      stored = null;
+    },
+  });
+  api.token = "access";
+  api.onExpired = () => {
+    expired++;
+  };
+  global.fetch = async () => {
+    calls++;
+    throw new TypeError("network lost");
+  };
+  await assert.rejects(api.refresh(), /network lost/);
+  assert.equal(calls, 1);
+  assert.equal(stored, null);
+  assert.equal(api.token, null);
+  assert.equal(expired, 1);
+});
+
+test("Logout waits for in-flight rotation and cannot resurrect a session", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  let stored = "old",
+    release,
+    started;
+  const began = new Promise((resolve) => {
+    started = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const api = new UserApi("http://test/api", {
+    kind: "NATIVE",
+    read: async () => stored,
+    write: async (v) => {
+      stored = v;
+    },
+    clear: async () => {
+      stored = null;
+    },
+  });
+  global.fetch = async (url, options) => {
+    if (url.endsWith("/tokens/refresh")) {
+      started();
+      await gate;
+      return new Response(
+        JSON.stringify({
+          code: "SUCCESS",
+          data: { accessToken: "new", refreshToken: "rotated" },
+        }),
+      );
+    }
+    assert.equal(JSON.parse(options.body).refreshToken, "rotated");
+    return new Response(JSON.stringify({ code: "SUCCESS", data: null }));
+  };
+  const rotating = api.refresh();
+  await began;
+  const logout = api.logout();
+  release();
+  await Promise.all([rotating, logout]);
+  assert.equal(api.token, null);
+  assert.equal(stored, null);
+});
+
+test("Web refresh sends only cookies and uses the exclusive rotation gate", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  let locks = 0,
+    cleared = false;
+  const api = new UserApi("http://test/api", {
+    kind: "WEB",
+    read: async () => null,
+    write: async () => {},
+    clear: async () => {
+      cleared = true;
+    },
+    exclusive: async (action) => {
+      locks++;
+      return action();
+    },
+  });
+  global.fetch = async (url, options) => {
+    assert.equal(options.credentials, "include");
+    assert.deepEqual(JSON.parse(options.body), { clientType: "WEB" });
+    return new Response(
+      JSON.stringify({ code: "SUCCESS", data: { accessToken: "web-access" } }),
+    );
+  };
+  assert.equal(await api.restore(), true);
+  assert.equal(locks, 1);
+  assert.equal(cleared, false);
+});
+
+test("A different account in another tab never receives the original pending write", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  const api = new UserApi("http://test/api", {
+    kind: "WEB",
+    read: async () => null,
+    write: async () => {},
+    clear: async () => {},
+  });
+  let writes = 0;
+  global.fetch = async (url) => {
+    if (url.endsWith("/login"))
+      return new Response(
+        JSON.stringify({
+          code: "SUCCESS",
+          data: { accessToken: "account-a", userId: "1" },
+        }),
+      );
+    if (url.endsWith("/tokens/refresh"))
+      return new Response(
+        JSON.stringify({
+          code: "SUCCESS",
+          data: { accessToken: "account-b", userId: "2" },
+        }),
+      );
+    writes++;
+    return new Response(
+      JSON.stringify({ code: "UNAUTHORIZED", message: "expired" }),
+      { status: 401 },
+    );
+  };
+  await api.login("a@example.com", "password");
+  await assert.rejects(
+    api.updateProfile({ name: "Changed" }),
+    (error) => error.code === "SESSION_CHANGED",
+  );
+  assert.equal(writes, 1);
+  assert.equal(api.token, null);
 });

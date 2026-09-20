@@ -29,6 +29,10 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   async function submit(sample = false) {
     if (busy) return;
     setBusy(true);
@@ -36,8 +40,35 @@ export default function AuthScreen() {
     try {
       if (!sample && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
         throw new Error("올바른 이메일을 입력해 주세요.");
-      if (state.mode === "http" && password.length < 8)
-        throw new Error("비밀번호는 8자 이상 입력해 주세요.");
+      if (state.mode === "http" && !password)
+        throw new Error("비밀번호를 입력해 주세요.");
+      if (register && state.userApi) {
+        if (!name.trim()) throw new Error("이름을 입력해 주세요.");
+        if (!terms || !privacy) throw new Error("필수 약관에 동의해 주세요.");
+        if (
+          password.length < 10 ||
+          password.length > 64 ||
+          !/[A-Za-z]/.test(password) ||
+          !/[0-9]/.test(password)
+        )
+          throw new Error(
+            "비밀번호는 영문과 숫자를 포함한 10~64자로 입력해 주세요.",
+          );
+        await state.userApi.register({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          consents: [
+            "TERMS_OF_SERVICE",
+            "PRIVACY_POLICY",
+            ...(marketing ? ["MARKETING"] : []),
+          ].map((consentType) => ({ consentType, version: "1.0" })),
+        });
+        setRegister(false);
+        setPassword("");
+        setNotice("회원가입이 완료됐어요. 로그인해 주세요.");
+        return;
+      }
       await state.authenticate(
         register && !sample ? name : null,
         sample ? state.sampleEmail! : email.trim(),
@@ -101,7 +132,7 @@ export default function AuthScreen() {
                 value={name}
                 onChangeText={setName}
                 placeholder="어떻게 불러드릴까요?"
-                maxLength={30}
+                maxLength={state.mode === "http" ? 50 : 30}
               />
             )}
             <Field
@@ -120,9 +151,29 @@ export default function AuthScreen() {
                 onChangeText={setPassword}
                 secureTextEntry
                 autoComplete={register ? "new-password" : "current-password"}
-                placeholder="8자 이상 입력해 주세요"
+                placeholder={register ? "영문·숫자 포함 10~64자" : "비밀번호"}
               />
             )}
+            {register && state.userApi && (
+              <View style={{ gap: 10, marginBottom: 16 }}>
+                <Chip
+                  title="[필수] 서비스 이용약관 동의 (1.0)"
+                  active={terms}
+                  onPress={() => setTerms(!terms)}
+                />
+                <Chip
+                  title="[필수] 개인정보 처리 동의 (1.0)"
+                  active={privacy}
+                  onPress={() => setPrivacy(!privacy)}
+                />
+                <Chip
+                  title="[선택] 마케팅 수신 동의 (1.0)"
+                  active={marketing}
+                  onPress={() => setMarketing(!marketing)}
+                />
+              </View>
+            )}
+            {notice ? <Text style={s.body}>{notice}</Text> : null}
             <ErrorMessage message={error || state.error} />
             <Button
               title={register ? "회원가입" : "로그인"}

@@ -14,7 +14,9 @@ src/domain/commands.ts  변경 검증과 로컬 도메인 규칙
 src/data/contracts.ts  TravelRepository, KeyValueStorage 인터페이스
 src/data/repository.ts 환경변수에 따른 저장소 선택
 src/data/mock-repository.ts 로컬 데이터 어댑터
-src/data/http-repository.ts HTTP 데이터 어댑터
+src/data/user-api.ts 실제 USER/Auth API 계약 및 오류 처리
+src/data/user-travel-repository.ts 서버 계정과 계정별 로컬 여행 저장
+src/data/http-repository.ts 미래 여행 서버용 제안 어댑터 (현재 미선택)
 src/data/fixtures/workspace.ts 모든 예시 사용자/여행/지출/메시지
 ```
 
@@ -37,7 +39,7 @@ src/data/fixtures/workspace.ts 모든 예시 사용자/여행/지출/메시지
 | 공지      | 작성·수정·삭제·고정, 작성자/여행장 권한 검사                                                    |
 | 대화·알림 | 여행 채팅 작성/보존, 날짜별 말풍선, 다른 멤버의 변경 알림과 관련 화면 이동                      |
 
-실제 인증 서버, 기기 간 실시간 협업·푸시 알림, 장소 검색/도로 길찾기 API, OCR 영수증 인식, GPS 공유, AI 여행 도우미는 아직 연결하지 않았다. 일정 지도는 온라인 타일 위에 저장한 좌표와 방문 순서 점선을 표시한다. 장소 수정에서 지도로 위치를 선택하거나 좌표를 입력할 수 있으며 주소 기반 외부 지도 열기도 유지한다. 송금 완료는 사용자의 수동 기록이며 금융 송금을 실행하지 않는다.
+회원 인증 및 USER API는 연결했다. 기기 간 실시간 협업·푸시 알림, 도로 길찾기 API, OCR 영수증 인식, GPS 공유, AI 여행 도우미는 아직 연결하지 않았다. 장소 검색은 백엔드 프록시를 통해 Google Places API (New)에 연결하고, 결과를 선택하면 이름·주소·분류·좌표를 폼에 채운다. 일정 지도는 Google Maps Static API 이미지 위에 저장한 좌표와 방문 순서 점선을 표시한다. 송금 완료는 사용자의 수동 기록이며 금융 송금을 실행하지 않는다.
 
 ## 도메인 규칙
 

@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Line } from "react-native-svg";
-import { mapProvider, tileUrl } from "../data/map-provider";
+import { googleMapImageUrl } from "../data/place-search";
 import {
   clamp,
   fitCamera,
@@ -18,7 +18,6 @@ import {
   screenPoint,
   TILE_SIZE,
   unproject,
-  visibleTiles,
   wrap,
   type MapCamera,
 } from "../domain/map-projection";
@@ -57,7 +56,6 @@ export function GeographicMap({
 }) {
   const [width, setWidth] = useState(0);
   const [override, setOverride] = useState<MapCamera | null>(null);
-  const [drag, setDrag] = useState({ x: 0, y: 0 });
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [retry, setRetry] = useState(0);
   const [linkError, setLinkError] = useState(false);
@@ -72,8 +70,13 @@ export function GeographicMap({
   );
   if (!markers.length) fit.zoom = Math.min(fit.zoom, 7);
   const camera = override ?? fit;
-  const tiles = width > 0 ? visibleTiles(camera, width, HEIGHT) : [];
-  const tileFailed = tiles.some((t) => failed[t.key]);
+  const mapWidth = Math.min(width, 640);
+  const imageUrl = googleMapImageUrl(
+    unproject(camera.center),
+    camera.zoom,
+    mapWidth,
+  );
+  const tileFailed = failed[imageUrl];
   const selectedCoordinates = markers.find(
     (marker) => marker.id === selectedId,
   )?.coordinates;
@@ -95,8 +98,6 @@ export function GeographicMap({
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > 8 || Math.abs(gesture.dy) > 8,
-        onPanResponderMove: (_, gesture) =>
-          setDrag({ x: gesture.dx, y: gesture.dy }),
         onPanResponderRelease: (_, gesture) => {
           const scale = TILE_SIZE * 2 ** camera.zoom;
           setOverride({
@@ -106,9 +107,7 @@ export function GeographicMap({
               y: clamp(camera.center.y - gesture.dy / scale, 0, 1),
             },
           });
-          setDrag({ x: 0, y: 0 });
         },
-        onPanResponderTerminate: () => setDrag({ x: 0, y: 0 }),
       }),
     [camera.center.x, camera.center.y, camera.zoom],
   );
@@ -197,43 +196,35 @@ export function GeographicMap({
             style={[
               StyleSheet.absoluteFill,
               {
-                transform: [{ translateX: drag.x }, { translateY: drag.y }],
                 pointerEvents: "none",
               },
             ]}
           >
-            {tiles.map((tile) => (
+            {width > 0 && (
               <Image
-                key={`${tile.key}:${retry}`}
-                source={{
-                  uri: tileUrl(tile.zoom, tile.x, tile.y),
-                  ...(Platform.OS !== "web"
-                    ? { headers: { "User-Agent": mapProvider.userAgent } }
-                    : {}),
-                }}
-                cachePolicy="memory-disk"
+                key={`${imageUrl}:${retry}`}
+                source={{ uri: `${imageUrl}&retry=${retry}` }}
+                cachePolicy="none"
                 contentFit="fill"
                 transition={0}
-                onError={() =>
-                  setFailed((current) => ({ ...current, [tile.key]: true }))
-                }
+                onError={() => setFailed({ [imageUrl]: true })}
                 onLoad={() =>
-                  setFailed((current) =>
-                    current[tile.key]
-                      ? { ...current, [tile.key]: false }
-                      : current,
-                  )
+                  setFailed((current) => (current[imageUrl] ? {} : current))
                 }
                 style={{
                   position: "absolute",
-                  left: tile.left,
-                  top: tile.top,
-                  width: TILE_SIZE,
-                  height: TILE_SIZE,
+                  left: (width - mapWidth) / 2,
+                  top: 0,
+                  width: mapWidth,
+                  height: HEIGHT,
                 }}
               />
-            ))}
-            <Svg width={width} height={HEIGHT} style={StyleSheet.absoluteFill}>
+            )}
+            <Svg
+              width={width}
+              height={HEIGHT - 26}
+              style={{ position: "absolute", top: 0, left: 0 }}
+            >
               {lines.map((line) => {
                 const from = screenPoint(line.from, camera, width, HEIGHT),
                   to = screenPoint(line.to, camera, width, HEIGHT);
@@ -256,9 +247,10 @@ export function GeographicMap({
         </Pressable>
         {markers.map((marker) => {
           const point = screenPoint(marker.coordinates, camera, width, HEIGHT);
-          const x = point.x + drag.x,
-            y = point.y + drag.y;
-          if (x < -30 || x > width + 30 || y < -30 || y > HEIGHT + 30)
+          const x = point.x,
+            y = point.y;
+          // Keep the Google logo and copyright strip unobstructed.
+          if (x < -30 || x > width + 30 || y < -30 || y > HEIGHT - 48)
             return null;
           return (
             <Pressable
@@ -292,13 +284,13 @@ export function GeographicMap({
           accessibilityRole="link"
           accessibilityLabel="지도 저작권 정보"
           onPress={() =>
-            void Linking.openURL(mapProvider.attributionUrl).catch(() =>
+            void Linking.openURL("https://maps.google.com").catch(() =>
               setLinkError(true),
             )
           }
           style={st.attribution}
         >
-          <Text style={st.attributionText}>{mapProvider.attribution}</Text>
+          <Text style={st.attributionText}>Google Maps</Text>
         </Pressable>
       </View>
       {tileFailed && (
@@ -381,7 +373,7 @@ const st = StyleSheet.create({
   zoomText: { fontSize: 23, color: p.ink },
   attribution: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     right: 0,
     backgroundColor: "#FFFFFFE8",
     paddingHorizontal: 6,

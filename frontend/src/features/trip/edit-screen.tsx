@@ -23,6 +23,7 @@ import { useTrip } from "./trip-context";
 import { parseCoordinates, validCoordinates } from "../../domain/route";
 import { GeographicMap } from "../../ui/geographic-map";
 import { palette as p } from "../../ui/theme";
+import { PlaceSearch } from "./place-search";
 
 type Kind = Exclude<Collection, "messages"> | "settings";
 const titles: Record<Kind, string> = {
@@ -118,6 +119,7 @@ function Editor({
     amount: string("amount"),
     budget: string("budget", String(trip.budget)),
     address: string("address"),
+    googlePlaceId: string("googlePlaceId"),
     latitude: validCoordinates(initial.coordinates)
       ? String(initial.coordinates.latitude)
       : "",
@@ -156,7 +158,6 @@ function Editor({
   const [archived, setArchived] = useState(trip.archived);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
-  const [mapOpen, setMapOpen] = useState(false);
   const previewCoordinates = {
     latitude: Number(form.latitude),
     longitude: Number(form.longitude),
@@ -171,7 +172,7 @@ function Editor({
       ...current,
       [key]: value,
       ...(key === "address" && value !== current.address
-        ? { latitude: "", longitude: "" }
+        ? { latitude: "", longitude: "", googlePlaceId: "" }
         : {}),
     }));
   const field = (
@@ -255,6 +256,7 @@ function Editor({
               name: form.title.trim(),
               address: form.address.trim(),
               coordinates: parseCoordinates(form.latitude, form.longitude),
+              googlePlaceId: form.googlePlaceId || undefined,
               category: form.category,
               note: form.note,
             },
@@ -382,16 +384,15 @@ function Editor({
       {trip.archived && kind !== "settings" && (
         <ErrorMessage message="종료한 여행이에요. 여행 설정에서 다시 열어 주세요." />
       )}
-      {field(
-        "title",
-        kind === "places"
-          ? "장소 이름"
-          : kind === "parties"
+      {kind !== "places" &&
+        field(
+          "title",
+          kind === "parties"
             ? "파티 이름"
             : kind === "settings"
               ? "여행 이름"
               : `${titles[kind]} 제목`,
-      )}
+        )}
       {(kind === "agenda" || kind === "parties" || kind === "expenses") &&
         field("date", "날짜 (YYYY-MM-DD)")}
       {(kind === "agenda" || kind === "parties") && (
@@ -449,26 +450,26 @@ function Editor({
       )}
       {kind === "places" && (
         <>
-          {field("address", "주소")}
-          <Section title="지도 위치 (선택)" />
-          <Text style={[s.small, { marginBottom: 12 }]}>
-            지도를 눌러 위치를 선택하거나 위도·경도를 입력해 주세요. 주소를
-            바꾸면 위치도 다시 선택해 주세요.
-          </Text>
-          <Button
-            title={mapOpen ? "위치 지도 접기" : "지도에서 위치 선택"}
-            secondary
-            icon="map"
-            onPress={() => setMapOpen((value) => !value)}
+          <PlaceSearch
+            onSelect={(place) => {
+              setForm((current) => ({
+                ...current,
+                title: place.name,
+                address: place.address,
+                latitude: String(place.coordinates.latitude),
+                longitude: String(place.coordinates.longitude),
+                googlePlaceId: place.id,
+                category: place.category,
+              }));
+            }}
           />
-          {mapOpen && (
+          {field("title", "장소 이름")}
+          {field("address", "주소")}
+          {hasCoordinates && (
             <View style={{ marginVertical: 12 }}>
+              <Text style={[s.strong, { marginBottom: 10 }]}>선택한 장소</Text>
               <GeographicMap
-                initialCenter={
-                  trip.places.find((place) =>
-                    validCoordinates(place.coordinates),
-                  )?.coordinates ?? { latitude: 36.3, longitude: 127.8 }
-                }
+                key={`${form.latitude}:${form.longitude}`}
                 markers={
                   hasCoordinates
                     ? [
@@ -482,24 +483,9 @@ function Editor({
                       ]
                     : []
                 }
-                onPick={(coordinates) =>
-                  setForm((current) => ({
-                    ...current,
-                    latitude: coordinates.latitude.toFixed(6),
-                    longitude: coordinates.longitude.toFixed(6),
-                  }))
-                }
               />
             </View>
           )}
-          <View style={{ marginTop: 12 }}>
-            {field("latitude", "위도", "예: 35.1587", {
-              keyboardType: "numbers-and-punctuation",
-            })}
-            {field("longitude", "경도", "예: 129.1604", {
-              keyboardType: "numbers-and-punctuation",
-            })}
-          </View>
           {hasCoordinates && (
             <Button
               title="위치 지우기"
@@ -509,6 +495,7 @@ function Editor({
                   ...current,
                   latitude: "",
                   longitude: "",
+                  googlePlaceId: "",
                 }))
               }
             />
