@@ -1,8 +1,0 @@
-package com.travel.travelbackend.exception;
-
-public class AccountDeletedException extends RuntimeException {
-
-    public AccountDeletedException() {
-        super("탈퇴한 계정입니다.");
-    }
-}
