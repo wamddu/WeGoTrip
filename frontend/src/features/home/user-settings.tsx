@@ -75,7 +75,6 @@ export function UserSettings() {
   }, []);
   return (
     <View style={{ gap: 12 }}>
-      <Section title="회원 정보 수정" />
       <ErrorMessage message={error} />
       {notice ? <Text style={s.body}>{notice}</Text> : null}
       {!profile ? (
@@ -86,62 +85,72 @@ export function UserSettings() {
         />
       ) : (
         <>
-          <Field
-            title="이름"
-            value={name}
-            onChangeText={setName}
-            maxLength={50}
-          />
-          <Button
-            title="이름 저장"
-            disabled={busy}
-            onPress={() =>
-              void run(async () => {
-                setProfile(await api.updateProfile({ name }));
-                await state.refresh();
-                setNotice("이름을 저장했어요.");
-              })
-            }
-          />
+          <Section title="회원 정보" />
+          <Card>
+            <View style={{ gap: 12 }}>
+              <Field
+                title="이름"
+                value={name}
+                onChangeText={setName}
+                maxLength={50}
+              />
+              <Button
+                title="이름 저장"
+                disabled={busy}
+                onPress={() =>
+                  void run(async () => {
+                    setProfile(await api.updateProfile({ name }));
+                    await state.refresh();
+                    setNotice("이름을 저장했어요.");
+                  })
+                }
+              />
+            </View>
+          </Card>
           <Section title="정산 계좌" />
-          <Text style={s.body}>
-            {profile.bankAccountNumberMasked ?? "등록된 계좌가 없어요."}
-          </Text>
-          <Field
-            title="새 계좌번호"
-            value={bank}
-            onChangeText={setBank}
-            keyboardType="number-pad"
-            placeholder="숫자 8~30자리"
-            maxLength={30}
-          />
-          <Button
-            title="계좌 저장"
-            disabled={busy || !bank}
-            onPress={() =>
-              void run(async () => {
-                setProfile(
-                  await api.updateProfile({ bankAccountNumber: bank }),
-                );
-                setBank("");
-                setNotice("계좌를 저장했어요.");
-              })
-            }
-          />
-          <Button
-            title="계좌 삭제"
-            secondary
-            disabled={busy || !profile.bankAccountNumberMasked}
-            onPress={() =>
-              void run(async () => {
-                setProfile(
-                  await api.updateProfile({ bankAccountNumber: null }),
-                );
-                setBank("");
-                setNotice("계좌를 삭제했어요.");
-              })
-            }
-          />
+          <Card>
+            <View style={{ gap: 12 }}>
+              <Text style={s.small}>등록된 계좌번호</Text>
+              <Text selectable style={s.strong}>
+                {profile.bankAccountNumber ?? "등록된 계좌가 없어요."}
+              </Text>
+              <Field
+                title="새 계좌번호"
+                value={bank}
+                onChangeText={setBank}
+                keyboardType="number-pad"
+                placeholder="숫자 8~30자리"
+                maxLength={30}
+              />
+              <Button
+                title="계좌 저장"
+                disabled={busy || !bank}
+                onPress={() =>
+                  void run(async () => {
+                    setProfile(
+                      await api.updateProfile({ bankAccountNumber: bank }),
+                    );
+                    setBank("");
+                    setNotice("계좌를 저장했어요.");
+                  })
+                }
+              />
+              <Button
+                title="계좌 삭제"
+                secondary
+                disabled={busy || !profile.bankAccountNumber}
+                onPress={() =>
+                  void run(async () => {
+                    setProfile(
+                      await api.updateProfile({ bankAccountNumber: null }),
+                    );
+                    setBank("");
+                    setNotice("계좌를 삭제했어요.");
+                  })
+                }
+              />
+            </View>
+          </Card>
           <Section title="알림·위치 설정" />
           {settings && (
             <Card>
@@ -186,68 +195,83 @@ export function UserSettings() {
             </Card>
           )}
           <Section title="약관 동의 내역" />
-          {consents.length ? (
-            consents.map((item) => (
-              <Text key={item.id} style={s.body}>
-                {(
-                  {
-                    TERMS_OF_SERVICE: "서비스 이용약관",
-                    PRIVACY_POLICY: "개인정보 처리",
-                    MARKETING: "마케팅 수신",
-                  } as Record<string, string>
-                )[item.consentType] ?? item.consentType}{" "}
-                · {item.version} ·{" "}
-                {new Date(item.agreedAt).toLocaleDateString("ko-KR")}
-              </Text>
-            ))
-          ) : (
-            <Text style={s.body}>동의 내역이 없어요.</Text>
-          )}
+          <Card>
+            <View style={{ gap: 12 }}>
+              {consents.length ? (
+                consents.map((item) => (
+                  <Text key={item.id} style={s.body}>
+                    {(
+                      {
+                        TERMS_OF_SERVICE: "서비스 이용약관",
+                        PRIVACY_POLICY: "개인정보 처리",
+                        MARKETING: "마케팅 수신",
+                      } as Record<string, string>
+                    )[item.consentType] ?? item.consentType}{" "}
+                    · {item.version} ·{" "}
+                    {new Date(item.agreedAt).toLocaleDateString("ko-KR")}
+                  </Text>
+                ))
+              ) : (
+                <Text style={s.body}>동의 내역이 없어요.</Text>
+              )}
+            </View>
+          </Card>
           <Section title="비밀번호 변경" />
-          <Field
-            title="현재 비밀번호"
-            value={current}
-            onChangeText={setCurrent}
-            secureTextEntry
-            autoComplete="current-password"
-          />
-          <Field
-            title="새 비밀번호"
-            value={next}
-            onChangeText={setNext}
-            secureTextEntry
-            autoComplete="new-password"
-            placeholder="영문·숫자 포함 10~64자"
-          />
-          <Text style={s.small}>
-            변경 후 모든 기기에서 다시 로그인해야 합니다.
-          </Text>
-          <Button
-            title="비밀번호 변경 후 로그아웃"
-            disabled={busy || !current || !next}
-            onPress={() =>
-              void run(async () => {
-                await api.changePassword(current, next);
-                setCurrent("");
-                setNext("");
-                await leave();
-              })
-            }
-          />
+          <Card>
+            <View style={{ gap: 12 }}>
+              <Field
+                title="현재 비밀번호"
+                value={current}
+                onChangeText={setCurrent}
+                secureTextEntry
+                autoComplete="current-password"
+              />
+              <Field
+                title="새 비밀번호"
+                value={next}
+                onChangeText={setNext}
+                secureTextEntry
+                autoComplete="new-password"
+                placeholder="영문·숫자 포함 10~64자"
+              />
+              <Text style={s.small}>
+                변경 후 모든 기기에서 다시 로그인해야 합니다.
+              </Text>
+              <Button
+                title="비밀번호 변경 후 로그아웃"
+                disabled={busy || !current || !next}
+                onPress={() =>
+                  void run(async () => {
+                    await api.changePassword(current, next);
+                    setCurrent("");
+                    setNext("");
+                    await leave();
+                  })
+                }
+              />
+            </View>
+          </Card>
           <Section title="회원 탈퇴" />
-          <Field
-            title="본인 확인 비밀번호"
-            value={reauth}
-            onChangeText={setReauth}
-            secureTextEntry
-            autoComplete="current-password"
-          />
-          <Button
-            title="회원 탈퇴"
-            danger
-            disabled={busy || !reauth}
-            onPress={() => setConfirm(true)}
-          />
+          <Card>
+            <View style={{ gap: 12 }}>
+              <Text style={s.small}>
+                탈퇴를 진행하려면 현재 비밀번호로 본인을 확인해 주세요.
+              </Text>
+              <Field
+                title="본인 확인 비밀번호"
+                value={reauth}
+                onChangeText={setReauth}
+                secureTextEntry
+                autoComplete="current-password"
+              />
+              <Button
+                title="회원 탈퇴"
+                danger
+                disabled={busy || !reauth}
+                onPress={() => setConfirm(true)}
+              />
+            </View>
+          </Card>
           <Confirm
             visible={confirm}
             title="회원 탈퇴할까요?"

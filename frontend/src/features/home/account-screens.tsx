@@ -93,35 +93,18 @@ export function ProfileScreen() {
         </View>
       </Card>
       <Section title="나의 여행 생활" />
-      <Button
-        title="친구 관리"
-        secondary
-        icon="users"
-        onPress={() => router.push("/friends")}
-      />
-      <View style={{ height: 12 }} />
-      <Button
-        title="내 여행 모두 보기"
-        secondary
-        icon="trips"
-        onPress={() => router.push("/trips")}
-      />
-      <Section title="앱 정보" />
       <Card>
-        <Text style={s.strong}>WeGoTrip · 함께 만드는 여행</Text>
-        <Text style={s.body}>
-          {mode === "mock"
-            ? "로컬 데이터 모드가 활성화되어 있어요. 변경한 내용은 이 기기에 저장됩니다. 다른 기기와는 아직 동기화되지 않아요."
-            : "회원 정보는 서버에 저장됩니다. 여행 데이터는 계정별로 이 기기에 저장되며 다른 기기와 동기화되지 않아요."}
-        </Text>
-        <Text style={s.small}>
-          일정의 지도 동선에서 방문 순서를 확인할 수 있어요. 실시간 위치·영수증
-          인식·AI 도우미는 후속 연결 기능입니다.
-        </Text>
+        <Button
+          title="친구 관리"
+          secondary
+          icon="users"
+          onPress={() => router.push("/friends")}
+        />
       </Card>
       {mode === "http" && <UserSettings />}
       <ErrorMessage message={error} />
-      <View style={{ marginTop: 25 }}>
+      <Section title="로그인 관리" />
+      <Card>
         <Button
           title="로그아웃"
           secondary
@@ -129,7 +112,7 @@ export function ProfileScreen() {
           onPress={() => setConfirm(true)}
           disabled={busy}
         />
-      </View>
+      </Card>
       <Confirm
         visible={confirm}
         title="로그아웃할까요?"

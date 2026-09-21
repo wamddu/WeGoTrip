@@ -59,7 +59,7 @@ src/data/fixtures/workspace.ts 모든 예시 사용자/여행/지출/메시지
 
 로컬 파일: `wegotrip-workspace-v1.json`, `wegotrip-local-session.json`. 웹 키: `wegotrip-workspace-v1`, `wegotrip-local-session`. 초기화가 필요하면 해당 브라우저의 사이트 데이터를 지우거나 앱 데이터를 초기화한다. 기존 입력 데이터도 함께 사라진다.
 
-로컬 프로필은 UI와 데이터 흐름 개발용이며 보안 인증이 아니다. 비밀번호를 저장하지 않는다. HTTP 어댑터의 access token은 메모리에만 보관하여 앱을 다시 켜면 로그인해야 한다. 서비스 운영 전 서버 인증/인가, 안전한 refresh token 저장, 계정 복구, 서버 트랜잭션과 충돌 처리가 필요하다. 클라이언트 도메인 검사는 서버 권한 검사의 대체물이 아니다.
+로컬 프로필은 UI와 데이터 흐름 개발용이며 보안 인증이 아니다. 비밀번호를 저장하지 않는다. HTTP 어댑터의 access token은 메모리에 보관하며 refresh token으로 앱 시작 시 복원하고 401 응답 시 자동 재발급한다. refresh token은 웹 HttpOnly 쿠키 또는 네이티브 SecureStore에 저장한다. USER/Auth는 서버 인증/인가를 수행하며, 계정 복구와 여행 서버 트랜잭션/충돌 처리는 별도 구현이 필요하다. 클라이언트 도메인 검사는 서버 권한 검사의 대체물이 아니다.
 
 ## 검사
 

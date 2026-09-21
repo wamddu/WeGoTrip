@@ -208,10 +208,16 @@ class UserApiTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumberMasked").value("********7890"));
         String encrypted = users.findById(Long.valueOf(id)).orElseThrow().getBankAccountEncrypted();
         assertFalse(encrypted.contains("001234567890"));
+        mvc.perform(get(BASE + "/me").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumber").value("001234567890"));
+        String other = create("other-bank@example.com");
+        mvc.perform(get(BASE + "/me").header("Authorization", token(other)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumber").value(org.hamcrest.Matchers.nullValue()));
         mvc.perform(patch(BASE + "/me").header("Authorization", bearer).contentType("application/json").content("{\"name\":\"새이름\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumberMasked").value("********7890"));
         mvc.perform(patch(BASE + "/me").header("Authorization", bearer).contentType("application/json").content("{\"bankAccountNumber\":null}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumberMasked").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.bankAccountNumberMasked").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.bankAccountNumber").value(org.hamcrest.Matchers.nullValue()));
         for (String body : List.of("{}", "{\"name\":null}", "{\"role\":\"ADMIN\"}", "{\"bankAccountNumber\":12345678}"))
             mvc.perform(patch(BASE + "/me").header("Authorization", bearer).contentType("application/json").content(body))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));

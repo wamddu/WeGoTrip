@@ -32,7 +32,7 @@ public class UserService {
     }
     public record Created(String id, String email, String name, Instant createdAt) {}
     public record Profile(String id, String email, String name, String role, String status, String loginProvider,
-                          String bankAccountNumberMasked, Instant createdAt, Instant updatedAt) {}
+                          String bankAccountNumberMasked, String bankAccountNumber, Instant createdAt, Instant updatedAt) {}
     public record Settings(boolean pushNotificationEnabled, boolean locationSharingEnabled) {}
     public record Device(String id, String deviceType, Instant createdAt, Instant lastActiveAt) {}
     public record DeviceSaved(boolean created, Device data) {}
@@ -85,7 +85,7 @@ public class UserService {
     }
     private Profile profile(User user) {
         return new Profile(user.getId().toString(), user.getEmail(), user.getName(), user.getRole(), user.getStatus(),
-                user.getLoginProvider(), bank.mask(user.getBankAccountEncrypted()), user.getCreatedAt(), user.getUpdatedAt());
+                user.getLoginProvider(), bank.mask(user.getBankAccountEncrypted()), bank.decrypt(user.getBankAccountEncrypted()), user.getCreatedAt(), user.getUpdatedAt());
     }
     public Profile me(Jwt jwt) { return profile(current(jwt)); }
     public Profile patch(Jwt jwt, Map<String, Object> body) {

@@ -973,6 +973,61 @@ test("Web refresh sends only cookies and uses the exclusive rotation gate", asyn
   assert.equal(cleared, false);
 });
 
+test("Late retry responses cannot overwrite or expire a newly logged-in account", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  for (const status of [200, 401]) {
+    const api = new UserApi("http://test/api", {
+      kind: "WEB",
+      read: async () => null,
+      write: async () => {},
+      clear: async () => {},
+    });
+    let release, started;
+    const began = new Promise((resolve) => {
+      started = resolve;
+    });
+    let requests = 0,
+      logins = 0;
+    const ok = (data) =>
+      new Response(JSON.stringify({ code: "SUCCESS", data }));
+    global.fetch = async (url) => {
+      if (url.endsWith("/login")) {
+        logins++;
+        return ok({ accessToken: `account-${logins}`, userId: String(logins) });
+      }
+      if (url.endsWith("/tokens/refresh"))
+        return ok({ accessToken: "rotated", userId: "1" });
+      if (++requests === 1)
+        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+          status: 401,
+        });
+      started();
+      return new Promise((resolve) => {
+        release = () =>
+          resolve(
+            status === 200
+              ? ok({ id: "1" })
+              : new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+                  status,
+                }),
+          );
+      });
+    };
+    await api.login("a@example.invalid", "test");
+    const pending = api.me();
+    await began;
+    await api.login("b@example.invalid", "test");
+    const rejected = assert.rejects(pending);
+    release();
+    await rejected;
+    assert.equal(api.token, "account-2");
+  }
+});
+
 test("A different account in another tab never receives the original pending write", async (t) => {
   const { UserApi } = require("../src/data/user-api.ts");
   const previous = global.fetch;

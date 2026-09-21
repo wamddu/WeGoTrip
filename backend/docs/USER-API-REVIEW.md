@@ -8,7 +8,7 @@
 - 최초 구현은 저장소 코드의 `users(id/name/email)`를 기준으로 했다. 2026-09-16 실제 WeGoTrip RDS 확인 결과 기존 테이블은 `user`이며, 코드 매핑을 이에 맞췄다. 비밀번호 해시는 기존 `password` 컬럼을 사용하고 다른 테이블의 외래키는 유지한다.
 - 기존 `/api/users`는 비밀번호 없이 사용자를 생성하고 엔티티를 그대로 반환했다. 이를 `/api/v1/users`와 응답 DTO로 대체했다. 기존 무인증 등록 엔드포인트를 별도로 남기지 않았다.
 - 프론트엔드는 로컬 여행 저장소를 사용하며, 기존 HTTP 어댑터의 `/auth/register` 및 Workspace 응답과 이 API 계약은 다르다. 환경변수만 HTTP로 바꿔서는 연결되지 않는다. 후속 작업에서 UserApi/UserTravelRepository로 회원 기능을 연결했으며, 여행은 계정별 로컬 저장을 유지한다.
-- 후속 사용자 요청으로 POST /api/v1/auth/login 및 /logout을 구현했다. BCrypt 검증 후 30분 JWT를 발급하고 로그아웃 시 tokenVersion으로 기존 토큰을 무효화한다. 재발급·소셜 로그인·이메일 인증·계정 복구는 미구현이다. 테스트는 서명한 JWT로 USER API의 인증 경계를 검증한다. 임시 무인증 userId 헤더나 테스트 로그인 엔드포인트는 만들지 않았다.
+- 후속 사용자 요청으로 POST /api/v1/auth/login 및 /logout을 구현했다. BCrypt 검증 후 30분 JWT를 발급하고 로그아웃 시 tokenVersion으로 기존 토큰을 무효화한다. 재발급은 POST /api/v1/auth/tokens/refresh로 구현했다. 소셜 로그인·이메일 인증·계정 복구는 미구현이다. 테스트는 서명한 JWT로 USER API의 인증 경계를 검증한다. 임시 무인증 userId 헤더나 테스트 로그인 엔드포인트는 만들지 않았다.
 
 ## 초안의 미확정 정책에 적용한 개발 기본값
 
@@ -37,7 +37,7 @@
 - 필수 claims: `sub`(문자열 사용자 ID), `iss`(기본 wegotrip-auth), `aud`(기본 wegotrip-api), `iat`, `exp`, `tokenVersion`(정수).
 - 탈퇴에는 실제 최근 재인증 시각을 초 단위로 담은 `auth_time`이 추가로 필요하다. 일반 토큰 갱신 때 auth_time을 현재 시각으로 바꾸면 안 된다.
 - 비밀번호 변경·탈퇴는 DB의 tokenVersion을 증가시킨다. USER API는 매 요청 DB 버전과 비교해 이전 토큰을 거절한다.
-- 추후 Auth의 refresh 처리와 다른 보호 API도 계정 상태/tokenVersion을 검사해야 모든 서비스에 세션 무효화가 적용된다. 아직 존재하지 않는 refresh 저장소를 구현했다고 가정하지 않는다.
+- Auth refresh는 별도 auth_refresh_credential 저장소와 계정 상태/tokenVersion 검사를 사용한다. 다른 보호 API를 추가할 때도 이 검사를 적용해야 세션 무효화가 유지된다.
 - 기존 지도 API와 `/api/test`의 접근 방식은 유지한다. 지도 전용 `mapsRun`도 보안 설정을 명시적으로 공유해 새 Security 의존성으로 기본 로그인 페이지가 생기지 않도록 했다.
 
 ## 스키마와 실행

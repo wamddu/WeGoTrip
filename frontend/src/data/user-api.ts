@@ -6,6 +6,7 @@ export interface UserProfile {
   status: string;
   loginProvider: string;
   bankAccountNumberMasked: string | null;
+  bankAccountNumber: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,9 +119,17 @@ export class UserApi {
         if (epoch !== this.generation || !this.token) throw error;
         // Only retry an explicit 401 once, never a timed-out or failed write.
         try {
-          return await this.send<T>(path, method, body, this.token);
+          const result = await this.send<T>(path, method, body, this.token);
+          if (epoch !== this.generation)
+            throw new ApiError(
+              401,
+              "SESSION_CHANGED",
+              "로그인 정보가 변경됐어요.",
+            );
+          return result;
         } catch (retryError) {
           if (
+            epoch === this.generation &&
             retryError instanceof ApiError &&
             (retryError.status === 401 ||
               retryError.code === "ACCOUNT_UNAVAILABLE")

@@ -35,7 +35,7 @@ Windows 네이티브 빌드는 프로젝트와 `node_modules`를 영어/숫자 �
 
 `EXPO_PUBLIC_DATA_SOURCE=http`는 `src/data/user-travel-repository.ts`를 사용합니다. 회원 정보는 `src/data/user-api.ts`를 통해 `/api/v1`에 연결하고, 여행 데이터는 서버 사용자 ID별 로컬 저장소에 보관합니다. 기존 `http-repository.ts`는 미래 여행 API용 제안 어댑터로 현재 선택되지 않습니다.
 
-회원가입·로그인·로그아웃·이름/계좌 수정·설정·동의 내역·비밀번호 변경·탈퇴를 연결했습니다. 로그인은 30분짜리 토큰을 메모리에 보관하며 앱 재시작/새로고침 후에는 다시 로그인합니다. 로그아웃과 비밀번호 변경은 모든 기기의 기존 토큰을 무효화합니다. 탈퇴는 현재 비밀번호로 재인증합니다. 기기 간 여행/친구/채팅 동기화, 실제 푸시·GPS·OCR·AI는 아직 연결하지 않았습니다.
+회원가입·로그인·로그아웃·이름/계좌 수정·설정·동의 내역·비밀번호 변경·탈퇴를 연결했습니다. Access token은 메모리에 보관하고 30일 유효한 refresh token으로 만료 시 자동 재발급 및 앱 시작/새로고침 시 로그인 복원을 수행합니다. 웹은 HttpOnly 쿠키, 네이티브는 SecureStore를 사용합니다. 로그아웃과 비밀번호 변경은 모든 기기의 기존 토큰을 무효화합니다. 탈퇴는 현재 비밀번호로 재인증합니다. 기기 간 여행/친구/채팅 동기화, 실제 푸시·GPS·OCR·AI는 아직 연결하지 않았습니다.
 
 웹 CORS 허용 주소는 백엔드 `users.allowed-origins`에 쉼표로 지정합니다(기본 localhost:8081, localhost:8082). 실기기는 두 API URL의 localhost를 PC의 LAN 주소로 변경하세요. 전체 기능은 `bootRun`이 필요하며 `mapsRun`은 지도 전용입니다. 상세 계약은 [USER API 연결](docs/USER-API.md)을 참고하세요.
 

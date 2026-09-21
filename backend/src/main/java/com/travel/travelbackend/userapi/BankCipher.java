@@ -25,13 +25,17 @@ public class BankCipher {
         } catch (Exception e) { throw new ApiException(500, "INTERNAL_SERVER_ERROR", "계좌 정보를 처리할 수 없습니다."); }
     }
     public String mask(String encrypted) {
+        String value = decrypt(encrypted);
+        return value == null ? null : "*".repeat(value.length() - 4) + value.substring(value.length() - 4);
+    }
+    public String decrypt(String encrypted) {
         if (encrypted == null) return null;
         try {
             String[] parts = encrypted.split("\\.");
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, Base64.getDecoder().decode(parts[0])));
             String value = new String(cipher.doFinal(Base64.getDecoder().decode(parts[1])), StandardCharsets.UTF_8);
-            return "*".repeat(value.length() - 4) + value.substring(value.length() - 4);
+            return value;
         } catch (Exception e) { throw new ApiException(500, "INTERNAL_SERVER_ERROR", "계좌 정보를 처리할 수 없습니다."); }
     }
 }
