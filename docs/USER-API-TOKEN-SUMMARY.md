@@ -22,7 +22,7 @@
 - 가입의 `consents`는 `{consentType, version}` 배열이다. `TERMS_OF_SERVICE`, `PRIVACY_POLICY`는 필수, `MARKETING`은 선택이다. 현재 약관 버전은 `1.0`이다.
 - 가입 직후에는 토큰을 발급하지 않으므로 별도 로그인이 필요하다.
 - 프로필 수정에서 필드 생략은 기존 값 유지, `bankAccountNumber: null`은 계좌 삭제다. 비밀번호는 BCrypt 해시, 계좌는 암호화해 저장한다.
-- 기기 API는 구현되어 있으나 프론트의 실제 FCM 발급·푸시 수신은 아직 연결하지 않았다.
+- 로그인 후 권한 확인·FCM 토큰 발급·기기 등록을 연결했다. Firebase 플랫폼 설정과 네이티브 개발 빌드가 필요하며, 여행 이벤트의 서버 푸시 발송은 별도 구현 대상이다.
 
 공통 응답은 성공 `{ "code": "SUCCESS", "data": ... }`, 실패 `{ "code": "오류코드", "message": "설명" }`이다. ID는 문자열, 시각은 UTC ISO8601 형식이다.
 
@@ -41,6 +41,22 @@
 재발급·로그아웃에는 만료된 access token을 보내지 않는다. 웹 요청은 `credentials: "include"`를 사용해 쿠키를 전송한다.
 
 ## 3. 토큰 저장 및 수명
+
+### Postman 재발급 요청
+
+`POST http://localhost:8080/api/v1/auth/tokens/refresh`에 다음 설정으로 요청한다.
+
+- Authorization: **No Auth**. 컬렉션의 Bearer 설정을 상속하지 않고, Headers에 직접 넣은 Authorization도 제거한다.
+- Body: **raw → JSON** (`Content-Type: application/json`).
+
+```json
+{
+  "clientType": "NATIVE",
+  "refreshToken": "로그인 응답의 data.refreshToken 값"
+}
+```
+
+Refresh token을 Bearer Token에 넣으면 JWT 검증 단계에서 401 `UNAUTHORIZED`("로그인이 필요합니다.")가 반환된다. 본문이 올바르더라도 잘못되거나 만료된 Bearer 헤더가 함께 있으면 같은 문제가 발생한다. 정상 재발급 후에는 응답의 **새 refreshToken**으로 교체한다. 내 정보 등 보호 API에는 응답의 **accessToken**을 Bearer Token으로 사용한다.
 
 | 구분 | Access token | Refresh token |
 | --- | --- | --- |

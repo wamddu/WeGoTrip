@@ -9,8 +9,11 @@ import {
 } from "react";
 import { repository } from "../data/repository";
 import type { Command, Session, Workspace } from "../domain/models";
+import { useDeviceRegistration } from "../notifications/use-device-registration";
+import { PushPermissionPrompt } from "../notifications/permission-prompt";
 
 type TravelContext = {
+  push: ReturnType<typeof useDeviceRegistration>;
   userApi?: import("../data/user-api").UserApi;
   session: Session | null;
   data: Workspace | null;
@@ -37,10 +40,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const [error, setError] = useState("");
   const lock = useRef(false);
   const revision = useRef(0);
+  const push = useDeviceRegistration(repository.userApi, session?.user.id);
+  const pushRef = useRef(push);
+  pushRef.current = push;
   useEffect(() => {
     const api = repository.userApi;
     if (!api) return;
     api.onExpired = () => {
+      void pushRef.current.disconnect(false);
       revision.current++;
       setSession(null);
       setData(null);
@@ -107,6 +114,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     email: string,
     password?: string,
   ) {
+    await pushRef.current.disconnect();
     revision.current++;
     const nextSession =
       name === null
@@ -138,6 +146,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     revision.current++;
     setBusy(true);
     try {
+      await pushRef.current.disconnect();
       await repository.signOut();
     } finally {
       setSession(null);
@@ -149,6 +158,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
   return (
     <Context.Provider
       value={{
+        push,
         userApi: repository.userApi,
         session,
         data,
@@ -164,6 +174,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
       }}
     >
       {children}
+      <PushPermissionPrompt
+        visible={!!session && push.status === "offer"}
+        allow={() => {
+          void push.request();
+        }}
+        dismiss={() => {
+          void push.dismiss();
+        }}
+      />
     </Context.Provider>
   );
 }

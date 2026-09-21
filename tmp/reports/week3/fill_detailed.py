@@ -1,0 +1,64 @@
+import contextlib,io,struct,zlib,json,math
+from pathlib import Path
+with contextlib.redirect_stdout(io.StringIO()):
+ import inspect_hwp as h
+r=[(t,l,bytes.fromhex(d)) for t,l,d in json.loads(Path('tmp/reports/week3/records.json').read_text())]
+content={int(k):v for k,v in json.loads(Path('tmp/reports/week3/content_detailed.json').read_text(encoding='utf8')).items()}
+r[39]=(r[39][0],r[39][1],r[39][2].replace('2주차'.encode('utf-16le'),'3주차'.encode('utf-16le')))
+# Each numbered section is a real HWP paragraph; update the cell paragraph count.
+out=[]; i=0
+while i<len(r):
+ if i not in content: out.append(r[i]); i+=1; continue
+ end=i+1
+ while end<len(r) and r[end][1]>2: end+=1
+ paragraphs=content[i].split('\n')
+ assert out[-1][0]==72
+ cell=bytearray(out[-1][2]); struct.pack_into('<I',cell,0,len(paragraphs))
+ out[-1]=(72,out[-1][1],bytes(cell))
+ for n,paragraph in enumerate(paragraphs):
+  data=(paragraph+'\r').encode('utf-16le')
+  header=bytearray(r[i][2])
+  struct.pack_into('<I',header,0,(0x80000000 if n==len(paragraphs)-1 else 0)|len(data)//2)
+  struct.pack_into('<I',header,4,0)
+  struct.pack_into('<H',header,12,1)
+  struct.pack_into('<H',header,14,0)
+  struct.pack_into('<H',header,16,0)
+  out.extend([(66,2,bytes(header)),(67,3,data),(68,3,struct.pack('<II',0,10))])
+ i=end
+raw=b''.join((struct.pack('<I',t|(l<<10)|(min(len(d),4095)<<20))+(struct.pack('<I',len(d)) if len(d)>=4095 else b''))+d for t,l,d in out)
+c=zlib.compressobj(9,zlib.DEFLATED,-15); body=c.compress(raw)+c.flush()
+streams={e['off']:h.read(e) for e in h.entries if e['type']==2}
+sec=next(e for e in h.entries if e['name']=='Section0');streams[sec['off']]=body
+preview=next(e for e in h.entries if e['name']=='PrvText')
+streams[preview['off']]=('\r\n'.join(['2026-2학기 세종창의학기제 주간학습보고서 (3주차)','10조 최정흠 / 22011683 / 2026.09.15.~2026.09.21']+[k+'\r\n'+content[n] for k,n in zip(['금주 학습목표','학습내용','학습방법','학습성과 및 목표달성도','참고자료 및 문헌','내주 계획'],content)])).encode('utf-16le')
+# Rebuild the compound file, preserving the directory tree and original binary assets.
+ss=h.ss; sectors=[]; fat=[]
+def alloc(data):
+ first=len(sectors); count=math.ceil(len(data)/ss)
+ for n in range(count):
+  sectors.append(data[n*ss:(n+1)*ss].ljust(ss,b'\0'));fat.append(first+n+1 if n<count-1 else 0xfffffffe)
+ return first if count else 0xfffffffe
+directory=bytearray(h.dirs);mini=bytearray();minifat=[]
+for e in h.entries:
+ if e['type']!=2:continue
+ data=streams[e['off']]
+ if len(data)<4096:
+  first=len(minifat);count=math.ceil(len(data)/64)
+  for j in range(count):
+   mini.extend(data[j*64:(j+1)*64].ljust(64,b'\0'));minifat.append(first+j+1 if j<count-1 else 0xfffffffe)
+  first=first if count else 0xfffffffe
+ else:first=alloc(data)
+ struct.pack_into('<I',directory,e['off']+116,first);struct.pack_into('<Q',directory,e['off']+120,len(data))
+rootstart=alloc(mini);struct.pack_into('<I',directory,116,rootstart);struct.pack_into('<Q',directory,120,len(mini))
+mfdata=struct.pack('<%dI'%len(minifat),*minifat);mfdata+=b'\xff'*((-len(mfdata))%ss);mfstart=alloc(mfdata)
+dir_start=alloc(directory)
+nf=math.ceil(len(sectors)/(ss//4-1))
+while math.ceil((len(sectors)+nf)/(ss//4))>nf:nf+=1
+fat_ids=list(range(len(sectors),len(sectors)+nf));fat.extend([0xfffffffd]*nf)
+fat.extend([0xffffffff]*(nf*ss//4-len(fat)));fb=struct.pack('<%dI'%len(fat),*fat)
+sectors.extend(fb[k*ss:(k+1)*ss] for k in range(nf))
+header=bytearray(h.b[:ss]);struct.pack_into('<I',header,44,nf);struct.pack_into('<I',header,48,dir_start);struct.pack_into('<I',header,60,mfstart);struct.pack_into('<I',header,64,len(mfdata)//ss);struct.pack_into('<I',header,68,0xfffffffe);struct.pack_into('<I',header,72,0)
+struct.pack_into('<109I',header,76,*(fat_ids+[0xffffffff]*(109-len(fat_ids))))
+dest=Path('other_documents/2026-2학기__010_최정흠_주간학습보고서_3주차_상세작성본.hwp');dest.write_bytes(header+b''.join(sectors))
+Path('other_documents/3주차_보고서_상세작성내용.txt').write_text('\n\n'.join(k+'\n'+content[n] for k,n in zip(['금주 학습목표','학습내용','학습방법','학습성과 및 목표달성도','참고자료 및 문헌','내주 계획'],content)),encoding='utf-8-sig')
+print(dest, len(body))

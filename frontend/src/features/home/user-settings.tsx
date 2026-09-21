@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { Platform, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useTravel } from "../../state/travel-provider";
 import {
@@ -154,6 +154,59 @@ export function UserSettings() {
           <Section title="알림·위치 설정" />
           {settings && (
             <Card>
+              <Text style={s.strong}>이 기기의 알림</Text>
+              <Text style={s.small}>
+                {
+                  {
+                    checking: "알림 권한을 확인하고 있어요.",
+                    unavailable: "이 환경에서는 기기 알림을 사용할 수 없어요.",
+                    offer: "알림을 허용하면 현재 기기를 등록해요.",
+                    idle: "아직 알림을 허용하지 않았어요.",
+                    denied:
+                      Platform.OS === "web"
+                        ? "브라우저 주소창의 사이트 설정에서 알림을 허용해 주세요."
+                        : "기기 설정에서 알림 권한을 허용해 주세요.",
+                    registering: "현재 기기를 등록하고 있어요.",
+                    registered: "현재 기기가 알림 수신 기기로 등록되어 있어요.",
+                    error:
+                      "기기를 등록하지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
+                  }[state.push.status]
+                }
+              </Text>
+              {(state.push.status === "idle" ||
+                state.push.status === "offer") && (
+                <Button
+                  title="알림 허용"
+                  secondary
+                  onPress={() => {
+                    void state.push.request();
+                  }}
+                />
+              )}
+              {state.push.status === "denied" && Platform.OS !== "web" && (
+                <Button
+                  title="기기 설정 열기"
+                  secondary
+                  onPress={() => {
+                    void state.push.openSettings();
+                  }}
+                />
+              )}
+              {state.push.status === "error" && state.push.failure && (
+                <Text selectable style={s.small}>
+                  실패 단계: {({permission:"알림 권한",token:"FCM 토큰 발급",server:"서버 기기 등록",storage:"기기 정보 저장"})[state.push.failure.stage]}
+                  {" · "}{state.push.failure.code}{state.push.failure.status ? ` (HTTP ${state.push.failure.status})` : ""}
+                </Text>
+              )}
+              {state.push.status === "error" && (
+                <Button
+                  title="기기 등록 다시 시도"
+                  secondary
+                  onPress={() => {
+                    void state.push.retry();
+                  }}
+                />
+              )}
               <View style={s.row}>
                 <Text style={s.flex}>푸시 알림</Text>
                 <Switch
@@ -189,8 +242,8 @@ export function UserSettings() {
                 />
               </View>
               <Text style={s.small}>
-                수신·공유 설정을 저장합니다. 실제 푸시 수신과 위치 전송은 아직
-                지원하지 않아요.
+                푸시 알림 설정은 계정 전체에 적용됩니다. 기기 권한과 별도로 켜고
+                끌 수 있어요. 위치 공유 설정은 실제 위치 전송을 시작하지 않아요.
               </Text>
             </Card>
           )}

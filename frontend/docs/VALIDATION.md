@@ -1,5 +1,13 @@
 # 검증 기록
 
+## 2026-09-21 로그인 후 기기 등록
+
+- typecheck, 프론트 테스트 42개 및 web/Android/iOS export 통과.
+- 권한 안내·승인 전 등록 금지, 거절 반복 방지, 같은 토큰 중복 등록 방지, 갱신·권한 철회·로그아웃 경합·등록 실패 재시도 검사 포함.
+- Android Firebase 설정의 앱 패키지 일치 및 Expo config introspect 성공.
+- Android 연결 기기 없음. OS 권한·실제 FCM 토큰 발급 및 서버 자동 등록은 미검증. iOS/웹은 Firebase 설정이 추가로 필요하다.
+- [설정 및 구현 상세](PUSH-DEVICE-REGISTRATION.md).
+
 ## 2026-09-21 토큰 재발급 검증
 
 - backend: 21 tests 통과. 회전/재사용/동시성, 비밀번호 변경·로그아웃·탈퇴 후 무효화 및 웹 쿠키/Origin 검사 포함.

@@ -55,6 +55,25 @@ class UserApiTests {
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder refreshRequest(String raw) {
         return post("/api/v1/auth/tokens/refresh").contentType("application/json").content("{\"refreshToken\":\""+raw+"\"}");
     }
+    @Test void refreshRequiresBodyCredentialAndRejectsInvalidInheritedBearer() throws Exception {
+        String id=create("postman-refresh@example.com");
+        String login=loginResponse("postman-refresh@example.com");
+        String raw=JsonPath.read(login,"$.data.refreshToken");
+        // Reproduce Postman's Bearer Token or inherited Authorization settings.
+        mvc.perform(post("/api/v1/auth/tokens/refresh").header("Authorization","Bearer "+raw))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
+        mvc.perform(refreshRequest(raw).header("Authorization","Bearer "+raw))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        mvc.perform(refreshRequest(raw).header("Authorization",token(id,0,0,"wegotrip-api",-120)))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        // Rejected headers have not consumed the body credential. No Auth succeeds.
+        String rotated=mvc.perform(refreshRequest(raw)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertNotEquals(raw,JsonPath.<String>read(rotated,"$.data.refreshToken"));
+        mvc.perform(get(BASE+"/me").header("Authorization","Bearer "+JsonPath.<String>read(rotated,"$.data.accessToken")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(id));
+    }
     @Test void refreshRotatesPreservesAuthenticationTimeAndRevokesOnReplay() throws Exception {
         String id=create("rotate@example.com");
         String login=loginResponse("rotate@example.com");

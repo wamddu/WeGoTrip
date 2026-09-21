@@ -26,6 +26,206 @@ const {
 const { MockTravelRepository } = require("../src/data/mock-repository.ts");
 const { HttpTravelRepository } = require("../src/data/http-repository.ts");
 const { searchPlaces } = require("../src/data/place-search.ts");
+const {
+  DeviceRegistration,
+} = require("../src/notifications/device-registration.ts");
+
+function pushFixture(permission = "undetermined") {
+  const values = new Map(),
+    calls = [],
+    states = [];
+  let changed = () => {},
+    token = "fcm-one";
+  const storage = {
+    read: async (key) => values.get(key) ?? null,
+    write: async (key, value) => {
+      values.set(key, value);
+    },
+    remove: async (key) => {
+      values.delete(key);
+    },
+  };
+  const platform = {
+    deviceType: "ANDROID",
+    permission: async () => permission,
+    requestPermission: async () => {
+      calls.push("permission");
+      permission = "granted";
+      return permission;
+    },
+    token: async () => token,
+    deleteToken: async () => {
+      calls.push("delete-token");
+    },
+    subscribe: (listener) => {
+      changed = listener;
+      return () => {
+        changed = () => {};
+      };
+    },
+    openSettings: async () => {},
+  };
+  const api = {
+    registerDevice: async (body) => {
+      calls.push(body);
+      return { id: "42" };
+    },
+    removeDevice: async (id) => {
+      calls.push(`remove-${id}`);
+    },
+  };
+  const make = () =>
+    new DeviceRegistration(
+      api,
+      storage,
+      platform,
+      "http://test/api",
+      "1",
+      (state) => states.push(state),
+    );
+  return {
+    values,
+    calls,
+    states,
+    platform,
+    api,
+    make,
+    changeToken: (value) => {
+      token = value;
+      changed();
+    },
+    changePermission: (value) => {
+      permission = value;
+    },
+  };
+}
+
+test("Push login offers permission without requesting or registering until the user allows", async () => {
+  const f = pushFixture(),
+    registration = f.make();
+  await registration.start();
+  assert.equal(f.states.at(-1), "offer");
+  assert.equal(f.calls.length, 0);
+  const requested = registration.request();
+  assert.equal(f.calls[0], "permission"); // Browser user gesture is not lost to an await.
+  await requested;
+  assert.equal(f.states.at(-1), "registered");
+  assert.equal(f.calls[1].fcmToken, "fcm-one");
+});
+test("Logout does not wait for an unanswered permission prompt or register after it resolves", async () => {
+  const f = pushFixture();
+  let allow;
+  f.platform.requestPermission = () =>
+    new Promise((resolve) => {
+      allow = () => resolve("granted");
+    });
+  const registration = f.make();
+  await registration.start();
+  const requesting = registration.request();
+  await Promise.resolve();
+  await registration.stop();
+  allow();
+  await requesting;
+  assert.deepEqual(f.calls, ["delete-token"]);
+  assert.notEqual(f.states.at(-1), "registered");
+});
+test("Push denial and a dismissed explanation are not repeatedly prompted on login", async () => {
+  const denied = pushFixture("denied");
+  await denied.make().start();
+  assert.equal(denied.states.at(-1), "denied");
+  assert.deepEqual(denied.calls, []);
+  const f = pushFixture(),
+    first = f.make();
+  await first.start();
+  await first.dismiss();
+  first.cancel();
+  await f.make().start();
+  assert.equal(f.states.at(-1), "idle");
+  assert.deepEqual(f.calls, []);
+});
+test("Granted push registration reuses its device ID and refreshes changed tokens without duplicates", async () => {
+  const f = pushFixture("granted"),
+    registration = f.make();
+  await registration.start();
+  await registration.sync();
+  assert.equal(f.calls.length, 1);
+  f.changeToken("fcm-two");
+  await registration.sync();
+  assert.deepEqual(f.calls[1], {
+    deviceId: "42",
+    fcmToken: "fcm-two",
+    deviceType: "ANDROID",
+  });
+  assert.equal(f.calls.length, 2);
+  registration.cancel();
+  await f.make().start();
+  assert.equal(f.calls[2].deviceId, "42");
+});
+test("Push registration failure does not reject login and can be retried", async () => {
+  const f = pushFixture("granted");
+  let failing = true;
+  f.api.registerDevice = async () => {
+    if (failing) throw new Error("offline");
+    return { id: "42" };
+  };
+  const registration = f.make();
+  await registration.start();
+  assert.equal(f.states.at(-1), "error");
+  failing = false;
+  await registration.sync();
+  assert.equal(f.states.at(-1), "registered");
+});
+test("Revoking OS notification permission removes the server device and invalidates its token", async () => {
+  const f = pushFixture("granted"),
+    registration = f.make();
+  await registration.start();
+  f.changePermission("denied");
+  await registration.sync();
+  assert.deepEqual(f.calls.slice(1), ["remove-42", "delete-token"]);
+  assert.equal(f.states.at(-1), "denied");
+});
+test("Logout drains an in-flight device registration and removes the resulting device", async () => {
+  const f = pushFixture("granted");
+  let release, began;
+  const entered = new Promise((resolve) => {
+    began = resolve;
+  });
+  f.api.registerDevice = () => {
+    began();
+    return new Promise((resolve) => {
+      release = () => resolve({ id: "99" });
+    });
+  };
+  const registration = f.make();
+  const start = registration.start();
+  await entered;
+  const stop = registration.stop();
+  release();
+  await Promise.all([start, stop]);
+  assert.deepEqual(f.calls, ["remove-99", "delete-token"]);
+  assert.equal(f.values.size, 0);
+  assert.notEqual(f.states.at(-1), "registered");
+});
+test("A stale device ID is recreated after 404 but a token owned by another account is not claimed", async () => {
+  const f = pushFixture("granted");
+  f.values.set("push-device-http%3A%2F%2Ftest%2Fapi-1", "old");
+  f.api.registerDevice = async (body) => {
+    f.calls.push(body);
+    if (body.deviceId) throw { status: 404 };
+    return { id: "42" };
+  };
+  await f.make().start();
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[1].deviceId, undefined);
+  const conflict = pushFixture("granted");
+  conflict.api.registerDevice = async (body) => {
+    conflict.calls.push(body);
+    throw { status: 409 };
+  };
+  await conflict.make().start();
+  assert.equal(conflict.calls.length, 1);
+  assert.equal(conflict.states.at(-1), "error");
+});
 
 test("장소 검색은 한글 검색어를 인코딩하고 잘못된 위치 결과를 제외", async (t) => {
   const original = global.fetch;
