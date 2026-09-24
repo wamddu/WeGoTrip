@@ -112,14 +112,14 @@ public class UserService {
             throw new ApiException(400, "PASSWORD_POLICY_VIOLATION", "기존 비밀번호와 다른 비밀번호를 입력해 주세요.");
         user.changePassword(passwords.encode(next), clock.instant());
     }
-    public void withdraw(Jwt jwt) {
+    public void withdraw(Jwt jwt, Map<String, Object> body) {
         User user = current(jwt);
-        Object claim = jwt.getClaims().get("auth_time");
-        long now = clock.instant().getEpochSecond();
-        if (!(claim instanceof Number number) || number.doubleValue() != (double) number.longValue() ||
-                number.longValue() > now || number.longValue() < now - 300)
-            throw new ApiException(403, "REAUTHENTICATION_REQUIRED", "최근 5분 이내 재인증이 필요합니다.");
-        user.withdraw(clock.instant());
+        Inputs.fields(body, "currentPassword");
+        String currentPassword = Inputs.string(body, "currentPassword", 1000, false);
+        if (currentPassword.getBytes(StandardCharsets.UTF_8).length > 72 || user.getPasswordHash() == null ||
+                !passwords.matches(currentPassword, user.getPasswordHash()))
+            throw new ApiException(400, "CURRENT_PASSWORD_MISMATCH", "현재 비밀번호가 일치하지 않습니다.");
+        user.withdraw(passwords.encode(UUID.randomUUID().toString()), clock.instant());
         devices.deleteByUserId(user.getId());
         settings.findById(user.getId()).ifPresent(setting -> setting.update(false, false));
     }

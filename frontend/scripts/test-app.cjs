@@ -972,6 +972,25 @@ test("Consent list matches nested server contract and failed reauthentication pr
   assert.equal(expired, true);
 });
 
+test("Withdrawal sends the current password in the authenticated DELETE request", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => { global.fetch = previous; });
+  const api = new UserApi("http://localhost:8080/api");
+  api.token = "access-token";
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    assert.equal(url, "http://localhost:8080/api/v1/users/me");
+    assert.equal(options.method, "DELETE");
+    assert.equal(options.headers.Authorization, "Bearer access-token");
+    assert.deepEqual(JSON.parse(options.body), { currentPassword: "Password123!" });
+    return new Response(JSON.stringify({ code: "SUCCESS", data: null }));
+  };
+  await api.withdraw("Password123!");
+  assert.equal(calls, 1);
+});
+
 test("Concurrent expired requests rotate once and retry with the new access token", async (t) => {
   const { UserApi } = require("../src/data/user-api.ts");
   const previous = global.fetch;

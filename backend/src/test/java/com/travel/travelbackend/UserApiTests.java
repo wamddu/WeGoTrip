@@ -112,16 +112,19 @@ class UserApiTests {
         refreshCredentials.save(new RefreshCredential(digest,Long.valueOf(other),1,Instant.now().minusSeconds(1000),Instant.now().minusSeconds(1)));
         mvc.perform(refreshRequest(raw)).andExpect(status().isUnauthorized());
     }
-    @Test void refreshDoesNotCountAsRecentAuthenticationAndWithdrawalRevokesIt() throws Exception {
+    @Test void refreshDoesNotBypassWithdrawalPasswordAndWithdrawalRevokesIt() throws Exception {
         String id=create("old-auth@example.com"), raw="b".repeat(43);
         String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(raw.getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
         refreshCredentials.save(new RefreshCredential(digest,Long.valueOf(id),0,Instant.now().minusSeconds(600),Instant.now().plusSeconds(3600)));
         String rotated=mvc.perform(refreshRequest(raw)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        mvc.perform(delete(BASE+"/me").header("Authorization","Bearer "+JsonPath.<String>read(rotated,"$.data.accessToken")))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("REAUTHENTICATION_REQUIRED"));
-        String login=loginResponse("old-auth@example.com");
-        mvc.perform(delete(BASE+"/me").header("Authorization","Bearer "+JsonPath.<String>read(login,"$.data.accessToken"))).andExpect(status().isOk());
-        mvc.perform(refreshRequest(JsonPath.read(login,"$.data.refreshToken"))).andExpect(status().isUnauthorized());
+        String access=JsonPath.read(rotated,"$.data.accessToken");
+        mvc.perform(delete(BASE+"/me").header("Authorization","Bearer "+access).contentType("application/json")
+                .content("{\"currentPassword\":\"wrong-password\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_MISMATCH"));
+        mvc.perform(delete(BASE+"/me").header("Authorization","Bearer "+access).contentType("application/json")
+                .content("{\"currentPassword\":\"MyPassword123!\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(refreshRequest(JsonPath.read(rotated,"$.data.refreshToken"))).andExpect(status().isUnauthorized());
     }
     @Test void browserRefreshIsHttpOnlyAndRequiresTrustedOrigin() throws Exception {
         create("cookie@example.com");
@@ -305,19 +308,35 @@ class UserApiTests {
         mvc.perform(delete(BASE + "/me/devices/" + deviceId).header("Authorization", bearer)).andExpect(status().isNotFound());
         assertEquals(0, devices.count());
     }
-    @Test void withdrawalRequiresRecentAuthenticationAndRevokesAccess() throws Exception {
+    @Test void withdrawalRequiresCurrentPasswordAnonymizesUserAndRevokesAccess() throws Exception {
         String id = create("a@b.com"), bearer = token(id);
-        mvc.perform(delete(BASE + "/me").header("Authorization", token(id, 0, Instant.now().minusSeconds(600).getEpochSecond(), "wegotrip-api", 600)))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("REAUTHENTICATION_REQUIRED"));
+        mvc.perform(delete(BASE + "/me").header("Authorization", bearer).contentType("application/json")
+                .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(delete(BASE + "/me").header("Authorization", bearer).contentType("application/json")
+                .content("{\"currentPassword\":\"wrong-password\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_MISMATCH"));
         mvc.perform(post(BASE + "/me/devices").header("Authorization", bearer).contentType("application/json")
                 .content("{\"fcmToken\":\"token\",\"deviceType\":\"WEB\"}")).andExpect(status().isCreated());
-        mvc.perform(delete(BASE + "/me").header("Authorization", bearer)).andExpect(status().isOk())
+        mvc.perform(patch(BASE + "/me").header("Authorization", bearer).contentType("application/json")
+                .content("{\"bankAccountNumber\":\"001234567890\"}")).andExpect(status().isOk());
+        assertNotNull(users.findById(Long.valueOf(id)).orElseThrow().getBankAccountEncrypted());
+        mvc.perform(delete(BASE + "/me").header("Authorization", bearer).contentType("application/json")
+                .content("{\"currentPassword\":\"MyPassword123!\"}"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
         User user = users.findById(Long.valueOf(id)).orElseThrow();
-        assertEquals("WITHDRAWN", user.getStatus()); assertNull(user.getPasswordHash()); assertEquals(0, devices.count());
+        assertEquals("DELETED", user.getStatus());
+        assertTrue(user.getEmail().matches("DELETED_[0-9a-f]{32}"));
+        assertTrue(user.getName().matches("DELETED_[0-9a-f]{32}"));
+        assertNotEquals(user.getEmail(), user.getName());
+        assertNotNull(user.getPasswordHash());
+        assertFalse(passwords.matches("MyPassword123!", user.getPasswordHash()));
+        assertNull(user.getBankAccountEncrypted()); assertEquals(0, devices.count());
         assertEquals(2, consents.count());
         mvc.perform(get(BASE + "/me").header("Authorization", bearer))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_UNAVAILABLE"));
+        create("a@b.com");
     }
     @Test void consentsArePrivateAndSortedByDescendingIdOnTies() throws Exception {
         String first = create("first@b.com"), second = create("second@b.com");
