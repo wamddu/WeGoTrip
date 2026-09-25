@@ -43,8 +43,4 @@ public class User {
     public void changePassword(String hash, Instant now) {
         this.passwordHash = hash; this.tokenVersion++; this.updatedAt = now;
     }
-    public void withdraw(Instant now) {
-        status = "WITHDRAWN"; passwordHash = null; bankAccountEncrypted = null;
-        name = "탈퇴한 사용자"; tokenVersion++; updatedAt = now;
-    }
 }

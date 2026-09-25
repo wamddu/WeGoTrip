@@ -156,6 +156,7 @@ function Editor({
   const [owner, setOwner] = useState<string | null>(string("ownerId") || null);
   const [pinned, setPinned] = useState(Boolean(initial.pinned));
   const [archived, setArchived] = useState(trip.archived);
+  const [version] = useState(trip.serverVersion);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
   const previewCoordinates = {
@@ -325,6 +326,7 @@ function Editor({
         case "settings":
           command = {
             type: "trip.update",
+            version,
             tripId: trip.id,
             input: {
               title: form.title.trim(),
@@ -639,6 +641,12 @@ function Editor({
       )}
       {kind === "settings" && (
         <>
+          {trip.serverVersion !== undefined && trip.archived && (
+            <Text style={s.small}>
+              먼저 여행 상태를 함께할 여행으로 변경해 저장한 뒤 정보를 수정해
+              주세요.
+            </Text>
+          )}
           {field("destination", "목적지")}
           {field("startDate", "출발일 (YYYY-MM-DD)")}
           {field("endDate", "마지막 날 (YYYY-MM-DD)")}
@@ -659,6 +667,11 @@ function Editor({
         </>
       )}
       <ErrorMessage message={error} />
+      {trip.serverVersion !== undefined && kind !== "settings" && (
+        <Text style={s.small}>
+          이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
+        </Text>
+      )}
       <View style={{ gap: 12, marginTop: 28 }}>
         <Button
           title="저장하기"

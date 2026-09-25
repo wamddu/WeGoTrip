@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 @Transactional
 public class UserService {
     private final UserRepository users;
+    private final RefreshCredentialRepository refreshCredentials;
     private final UserSettingRepository settings;
     private final UserDeviceRepository devices;
     private final UserConsentRepository consents;
@@ -24,11 +25,14 @@ public class UserService {
     private final BankCipher bank;
     private final Clock clock;
     private final String consentVersion;
+    private final com.travel.travelbackend.tripapi.TripService trips;
     public UserService(UserRepository users, UserSettingRepository settings, UserDeviceRepository devices,
                        UserConsentRepository consents, PasswordEncoder passwords, BankCipher bank, Clock clock,
-                       @Value("${users.consent-version:1.0}") String consentVersion) {
+                       @Value("${users.consent-version:1.0}") String consentVersion,
+                       com.travel.travelbackend.tripapi.TripService trips, RefreshCredentialRepository refreshCredentials) {
         this.users = users; this.settings = settings; this.devices = devices; this.consents = consents;
         this.passwords = passwords; this.bank = bank; this.clock = clock; this.consentVersion = consentVersion;
+        this.trips = trips; this.refreshCredentials = refreshCredentials;
     }
     public record Created(String id, String email, String name, Instant createdAt) {}
     public record Profile(String id, String email, String name, String role, String status, String loginProvider,
@@ -119,9 +123,15 @@ public class UserService {
         if (!(claim instanceof Number number) || number.doubleValue() != (double) number.longValue() ||
                 number.longValue() > now || number.longValue() < now - 300)
             throw new ApiException(403, "REAUTHENTICATION_REQUIRED", "최근 5분 이내 재인증이 필요합니다.");
-        user.withdraw(clock.instant());
+        trips.withdraw(user.getId());
+        refreshCredentials.deleteByUserId(user.getId());
         devices.deleteByUserId(user.getId());
-        settings.findById(user.getId()).ifPresent(setting -> setting.update(false, false));
+        consents.deleteAll(consents.findByUserIdOrderByAgreedAtDescIdDesc(user.getId()));
+        settings.findById(user.getId()).ifPresent(settings::delete);
+        // Flush dependent deletes before removing the referenced user.
+        users.flush();
+        users.delete(user);
+        users.flush();
     }
     public Settings settings(Jwt jwt) {
         User user = current(jwt);

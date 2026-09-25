@@ -6,6 +6,7 @@ export interface KeyValueStorage {
 }
 export interface TravelRepository {
   readonly userApi?: import("./user-api").UserApi;
+  readonly tripApi?: import("./trip-api").TripApi;
   readonly mode: "mock" | "http";
   readonly sampleEmail?: string;
   restoreSession(): Promise<Session | null>;

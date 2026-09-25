@@ -3,6 +3,7 @@ import com.travel.travelbackend.entity.RefreshCredential;
 import org.springframework.data.jpa.repository.*;
 import java.util.Optional;
 public interface RefreshCredentialRepository extends JpaRepository<RefreshCredential, String> {
+    void deleteByUserId(Long userId);
     // Scalar projection avoids caching a stale credential before obtaining the user lock.
     @Query("select r.userId from RefreshCredential r where r.digest = :digest")
     Optional<Long> ownerOf(String digest);

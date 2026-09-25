@@ -313,11 +313,14 @@ class UserApiTests {
                 .content("{\"fcmToken\":\"token\",\"deviceType\":\"WEB\"}")).andExpect(status().isCreated());
         mvc.perform(delete(BASE + "/me").header("Authorization", bearer)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
-        User user = users.findById(Long.valueOf(id)).orElseThrow();
-        assertEquals("WITHDRAWN", user.getStatus()); assertNull(user.getPasswordHash()); assertEquals(0, devices.count());
-        assertEquals(2, consents.count());
+        assertFalse(users.existsById(Long.valueOf(id)));
+        assertEquals(0, devices.count());
+        assertEquals(0, consents.count());
+        assertEquals(0, settings.count());
+        assertEquals(0, refreshCredentials.count());
         mvc.perform(get(BASE + "/me").header("Authorization", bearer))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_UNAVAILABLE"));
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        assertNotEquals(id, create("a@b.com"));
     }
     @Test void consentsArePrivateAndSortedByDescendingIdOnTies() throws Exception {
         String first = create("first@b.com"), second = create("second@b.com");

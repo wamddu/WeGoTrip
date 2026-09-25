@@ -6,7 +6,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Map;
-@RestControllerAdvice(assignableTypes = {UserController.class, com.travel.travelbackend.controller.AuthController.class})
+@RestControllerAdvice(assignableTypes = {UserController.class, com.travel.travelbackend.controller.AuthController.class, com.travel.travelbackend.controller.TripController.class})
 public class UserApiErrors {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<?> api(ApiException e) { return response(e.status, e.code, e.getMessage()); }
