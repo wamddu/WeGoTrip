@@ -18,28 +18,66 @@ import { Confirm, Page } from "../../ui/shell";
 import { palette as p } from "../../ui/theme";
 import { tripHref } from "./home-screen";
 import { UserSettings } from "./user-settings";
+import { FriendRequests, TripInvitations } from "./invitation-panels";
+import type { User } from "../../domain/models";
 
 export function FriendsScreen() {
-  const { data, session, execute, busy } = useTravel();
+  const { data, session, execute, busy, tripApi, refresh } = useTravel();
+  const [found, setFound] = useState<User | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [message, setMessage] = useState("");
+  const [remove, setRemove] = useState<User | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const friends = data?.friendships[session!.user.id] ?? [];
   const matches =
-    data?.users.filter(
-      (u) =>
-        u.id !== session!.user.id &&
-        (search
-          ? `${u.name} ${u.email}`.toLowerCase().includes(search.toLowerCase())
-          : friends.includes(u.id)),
-    ) ?? [];
+    tripApi && found
+      ? [found]
+      : (data?.users.filter(
+          (u) =>
+            u.id !== session!.user.id &&
+            (search
+              ? `${u.name} ${u.email}`
+                  .toLowerCase()
+                  .includes(search.toLowerCase())
+              : friends.includes(u.id)),
+        ) ?? []);
   return (
     <Page title="함께 떠날 친구" back>
       <Field
-        title="이름 또는 이메일 검색"
+        title={tripApi ? "친구 이름 또는 가입 이메일" : "이름 또는 이메일 검색"}
         value={search}
-        onChangeText={setSearch}
+        onChangeText={(value) => {
+          setSearch(value);
+          setFound(null);
+          setMessage("");
+        }}
         placeholder="친구를 찾아보세요"
+        editable={!searching}
       />
+      {tripApi && (
+        <Button
+          title="이메일로 회원 찾기"
+          loading={searching}
+          onPress={() => {
+            setSearching(true);
+            setError("");
+            setFound(null);
+            void tripApi
+              .lookup(search.trim())
+              .then(({ user }) => {
+                setFound(
+                  user ? { ...user, email: "", color: "#D8ECFF" } : null,
+                );
+                if (!user) setMessage("해당 이메일의 회원을 찾을 수 없어요.");
+              })
+              .catch((e) => setError(e.message))
+              .finally(() => setSearching(false));
+          }}
+        />
+      )}
+      {!!message && <Text style={s.small}>{message}</Text>}
       <ErrorMessage message={error} />
       {matches.map((u) => (
         <View key={u.id} style={{ marginBottom: 12 }}>
@@ -51,16 +89,32 @@ export function FriendsScreen() {
                 <Text style={s.small}>{u.email}</Text>
               </View>
               {friends.includes(u.id) ? (
-                <Badge>친구</Badge>
+                <View style={s.wrap}>
+                  <Badge>친구</Badge>
+                  {tripApi && (
+                    <Button
+                      title="친구 삭제"
+                      secondary
+                      disabled={busy || searching}
+                      onPress={() => setRemove(u)}
+                    />
+                  )}
+                </View>
               ) : (
                 <Button
-                  title="추가"
+                  title={tripApi ? "친구 요청" : "추가"}
                   secondary
                   disabled={busy}
                   onPress={() => {
-                    void execute({ type: "friend.add", userId: u.id }).catch(
-                      (e) => setError(e.message),
-                    );
+                    void execute({ type: "friend.add", userId: u.id })
+                      .then(() => {
+                        setRevision((v) => v + 1);
+                        if (tripApi)
+                          setMessage(
+                            "친구 요청을 보냈어요. 상대방 수락 후 친구로 표시됩니다.",
+                          );
+                      })
+                      .catch((e) => setError(e.message));
                   }}
                 />
               )}
@@ -71,9 +125,29 @@ export function FriendsScreen() {
       {!matches.length && (
         <Empty
           title="친구를 찾아보세요"
-          description="등록된 이름이나 이메일로 검색할 수 있어요."
+          description={
+            tripApi
+              ? "친구 목록은 이름으로, 새 친구는 가입 이메일 전체로 찾을 수 있어요."
+              : "등록된 이름이나 이메일로 검색할 수 있어요."
+          }
         />
       )}
+      <FriendRequests revision={revision} />
+      <Confirm
+        visible={!!remove}
+        title="친구 관계를 삭제할까요?"
+        description="함께하는 여행방은 유지돼요."
+        onCancel={() => setRemove(null)}
+        onConfirm={() => {
+          const target = remove;
+          setRemove(null);
+          if (target && tripApi)
+            void tripApi
+              .removeFriend(target.id)
+              .then(() => refresh())
+              .catch((e) => setError(e.message));
+        }}
+      />
     </Page>
   );
 }
@@ -182,6 +256,7 @@ export function NotificationsScreen() {
           </Card>
         </Pressable>
       ))}
+      <TripInvitations />
       {!notifications.length && (
         <Empty
           title="아직 새로운 소식이 없어요"

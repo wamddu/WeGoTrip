@@ -66,6 +66,7 @@ export interface Message {
   createdAt: string;
 }
 export interface Trip {
+  serverVersion?: number;
   id: string;
   title: string;
   destination: string;
@@ -140,6 +141,7 @@ export type Command =
   | {
       type: "trip.update";
       tripId: string;
+      version?: number;
       input: Omit<TripInput, "memberIds"> & { archived: boolean };
     }
   | { type: "trip.invite"; tripId: string; userId: string }

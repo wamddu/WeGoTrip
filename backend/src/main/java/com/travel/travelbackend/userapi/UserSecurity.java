@@ -44,11 +44,14 @@ public class UserSecurity {
         var cors = new org.springframework.web.cors.CorsConfiguration();
         cors.setAllowedOrigins(java.util.Arrays.stream(origins.split(",")).map(String::trim).toList());
         cors.setAllowedMethods(java.util.List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization"));
+        cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "Idempotency-Key"));
         cors.setAllowCredentials(true);
         var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/v1/**", cors);
-        return http.securityMatcher("/api/v1/users", "/api/v1/users/**", "/api/v1/auth/**")
+        return http.securityMatcher("/api/v1/users", "/api/v1/users/**", "/api/v1/auth/**",
+                        "/api/v1/trips", "/api/v1/trips/**", "/api/v1/friends", "/api/v1/friends/**",
+                        "/api/v1/friend-requests", "/api/v1/friend-requests/**", "/api/v1/trip-invitations/**",
+                        "/api/v1/trip-join", "/api/v1/trip-join/**")
                 .cors(config -> config.configurationSource(source))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

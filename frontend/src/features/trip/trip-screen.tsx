@@ -165,6 +165,12 @@ export default function TripScreen() {
         >
           <ErrorMessage message={error} />
           <ReadOnlyNote />
+          {trip.serverVersion !== undefined && (
+            <Text style={[s.small, { marginBottom: 12 }]}>
+              여행 정보·멤버는 함께 공유해요. 일정·장소·정산·준비물·공지·대화는
+              현재 이 기기에만 저장돼요.
+            </Text>
+          )}
           {content}
         </ScrollView>
         {active === "chat" && <ChatComposer />}

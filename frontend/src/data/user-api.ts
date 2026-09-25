@@ -54,6 +54,7 @@ export class UserApi {
     method: string,
     body: unknown,
     token: string | null,
+    headers: Record<string, string> = {},
   ): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -67,6 +68,7 @@ export class UserApi {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...headers,
           },
           body: body === undefined ? undefined : JSON.stringify(body),
         },
@@ -98,12 +100,17 @@ export class UserApi {
       if (notify) this.onExpired?.();
     }
   }
-  async request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  async request<T>(
+    path: string,
+    method = "GET",
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     const epoch = this.generation;
     const sentToken =
       path.startsWith("/auth/") || path === "/users" ? null : this.token;
     try {
-      const result = await this.send<T>(path, method, body, sentToken);
+      const result = await this.send<T>(path, method, body, sentToken, headers);
       if (sentToken && epoch !== this.generation)
         throw new ApiError(401, "SESSION_CHANGED", "로그인 정보가 변경됐어요.");
       return result;
@@ -119,7 +126,13 @@ export class UserApi {
         if (epoch !== this.generation || !this.token) throw error;
         // Only retry an explicit 401 once, never a timed-out or failed write.
         try {
-          const result = await this.send<T>(path, method, body, this.token);
+          const result = await this.send<T>(
+            path,
+            method,
+            body,
+            this.token,
+            headers,
+          );
           if (epoch !== this.generation)
             throw new ApiError(
               401,

@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Share, Text, View } from "react-native";
 import {
   Avatar,
@@ -12,12 +12,24 @@ import {
   Section,
   styles as s,
 } from "../../ui/components";
-import { Page } from "../../ui/shell";
+import { Confirm, Page } from "../../ui/shell";
+import { TripInvitations } from "../home/invitation-panels";
 import { useTrip } from "./trip-context";
 import { editHref } from "./shared";
 
 export default function ManageScreen() {
-  const { trip, data, session, execute, busy } = useTrip();
+  const { trip, data, session, execute, busy, tripApi, refresh } = useTrip();
+  const [issuedCode, setIssuedCode] = useState("");
+  const [codeAction, setCodeAction] = useState<"issue" | "revoke" | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [message, setMessage] = useState("");
+  useFocusEffect(
+    useCallback(() => {
+      if (tripApi) void refresh();
+      return () => setIssuedCode("");
+    }, [tripApi, refresh]),
+  );
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   if (!trip)
@@ -34,6 +46,7 @@ export default function ManageScreen() {
     ? data!.users.filter(
         (u) =>
           !trip.memberIds.includes(u.id) &&
+          (!tripApi || data!.friendships[session!.user.id]?.includes(u.id)) &&
           `${u.name} ${u.email}`
             .toLowerCase()
             .includes(search.trim().toLowerCase()),
@@ -70,25 +83,54 @@ export default function ManageScreen() {
           </View>
         ))}
       <Section title="친구 초대" />
-      <Card>
-        <Text style={s.small}>우리 여행의 초대 코드</Text>
-        <Text selectable style={[s.title, { letterSpacing: 3 }]}>
-          {trip.inviteCode}
+      {(!tripApi || (owner && !trip.archived)) && (
+        <Card>
+          <Text style={s.small}>우리 여행의 초대 코드</Text>
+          <Text selectable style={[s.title, { letterSpacing: 3 }]}>
+            {tripApi ? issuedCode || "코드를 발급해 주세요" : trip.inviteCode}
+          </Text>
+          <Button
+            title="초대 코드 공유"
+            disabled={!!tripApi && !issuedCode}
+            secondary
+            icon="link"
+            onPress={() => {
+              void Share.share({
+                message: `${trip.title}에 함께해요! WeGoTrip에서 초대 코드 ${tripApi ? issuedCode : trip.inviteCode}를 입력해 주세요.`,
+              }).catch(() =>
+                setError("공유 창을 열지 못했어요. 위 코드를 복사해 주세요."),
+              );
+            }}
+          />
+          {tripApi && (
+            <>
+              <Text style={s.small}>
+                코드는 7일간 유효하며 이 화면에서만 확인할 수 있어요. 새로
+                발급하면 이전 코드는 폐기돼요. 코드를 받은 사람은 친구가
+                아니어도 참여할 수 있어요.
+              </Text>
+              <Button
+                title="새 초대 코드 발급"
+                secondary
+                disabled={codeBusy}
+                onPress={() => setCodeAction("issue")}
+              />
+              <Button
+                title="초대 코드 폐기"
+                secondary
+                disabled={codeBusy}
+                onPress={() => setCodeAction("revoke")}
+              />
+            </>
+          )}
+        </Card>
+      )}
+      {tripApi && !owner && (
+        <Text style={s.small}>
+          친구 초대와 코드 발급은 여행장이 할 수 있어요.
         </Text>
-        <Button
-          title="초대 코드 공유"
-          secondary
-          icon="link"
-          onPress={() => {
-            void Share.share({
-              message: `${trip.title}에 함께해요! WeGoTrip에서 초대 코드 ${trip.inviteCode}를 입력해 주세요.`,
-            }).catch(() =>
-              setError("공유 창을 열지 못했어요. 위 코드를 복사해 주세요."),
-            );
-          }}
-        />
-      </Card>
-      {owner && (
+      )}
+      {owner && !trip.archived && (
         <View style={{ marginTop: 18 }}>
           <Field
             title="초대할 친구 검색"
@@ -109,7 +151,14 @@ export default function ManageScreen() {
                     tripId: trip.id,
                     userId: u.id,
                   })
-                    .then(() => setSearch(""))
+                    .then(() => {
+                      setSearch("");
+                      setRevision((v) => v + 1);
+                      if (tripApi)
+                        setMessage(
+                          "초대를 보냈어요. 친구가 수락하면 멤버에 추가돼요.",
+                        );
+                    })
                     .catch((e) => setError(e.message));
                 }}
               />
@@ -117,11 +166,18 @@ export default function ManageScreen() {
           ))}
         </View>
       )}
+      {!!message && <Text style={s.small}>{message}</Text>}
+      {tripApi && owner && (
+        <TripInvitations tripId={trip.id} revision={revision} />
+      )}
       <Section
         title="파티 관리"
         action="파티 만들기"
         onPress={() => router.push(editHref(trip.id, "parties"))}
       />
+      {tripApi && (
+        <Text style={s.small}>파티와 일정은 현재 이 기기에만 저장돼요.</Text>
+      )}
       {trip.parties.map((party) => (
         <View key={party.id} style={{ marginBottom: 12 }}>
           <Card>
@@ -151,6 +207,30 @@ export default function ManageScreen() {
         </Text>
       )}
       <ErrorMessage message={error} />
+      <Confirm
+        visible={!!codeAction}
+        title={
+          codeAction === "issue"
+            ? "새 초대 코드를 발급할까요?"
+            : "초대 코드를 폐기할까요?"
+        }
+        description="기존 코드는 더 이상 사용할 수 없어요."
+        onCancel={() => setCodeAction(null)}
+        onConfirm={() => {
+          const action = codeAction;
+          setCodeAction(null);
+          if (!tripApi || codeBusy) return;
+          setCodeBusy(true);
+          setError("");
+          void (
+            action === "issue"
+              ? tripApi.issueCode(trip.id).then((r) => setIssuedCode(r.code))
+              : tripApi.revokeCode(trip.id).then(() => setIssuedCode(""))
+          )
+            .catch((e) => setError(e.message))
+            .finally(() => setCodeBusy(false));
+        }}
+      />
     </Page>
   );
 }
