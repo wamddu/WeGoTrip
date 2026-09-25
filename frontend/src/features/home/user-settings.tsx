@@ -328,14 +328,13 @@ export function UserSettings() {
           <Confirm
             visible={confirm}
             title="회원 탈퇴할까요?"
-            description="계정 사용이 중지되고 등록 기기와 계좌가 삭제됩니다. 이메일과 약관 기록, 여행 데이터는 남습니다."
+            description="계정 사용이 중지되고 이메일과 이름이 익명화됩니다. 등록 기기와 계좌는 삭제되며 약관 기록과 여행 데이터는 남습니다."
             busy={busy}
             onCancel={() => setConfirm(false)}
             onConfirm={() =>
               void run(async () => {
-                await api.login(profile.email, reauth);
+                await api.withdraw(reauth);
                 setReauth("");
-                await api.withdraw();
                 setConfirm(false);
                 await leave();
               })

@@ -328,8 +328,8 @@ export class UserApi {
       newPassword,
     });
   }
-  withdraw() {
-    return this.request<null>("/users/me", "DELETE");
+  withdraw(currentPassword: string) {
+    return this.request<null>("/users/me", "DELETE", { currentPassword });
   }
   registerDevice(body: {
     deviceId?: string;

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "`user`")
@@ -42,5 +43,11 @@ public class User {
     public void bank(String encrypted, Instant now) { this.bankAccountEncrypted = encrypted; this.updatedAt = now; }
     public void changePassword(String hash, Instant now) {
         this.passwordHash = hash; this.tokenVersion++; this.updatedAt = now;
+    }
+    public void withdraw(String replacementPasswordHash, Instant now) {
+        status = "DELETED"; passwordHash = replacementPasswordHash; bankAccountEncrypted = null;
+        email = "DELETED_" + UUID.randomUUID().toString().replace("-", "");
+        name = "DELETED_" + UUID.randomUUID().toString().replace("-", "");
+        tokenVersion++; updatedAt = now;
     }
 }
