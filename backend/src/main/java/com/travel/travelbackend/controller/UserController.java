@@ -23,8 +23,8 @@ public class UserController {
     @PutMapping("/me/password") public ApiResponse<?> password(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, Object> body) {
         service.password(jwt, body); return ApiResponse.success(null);
     }
-    @DeleteMapping("/me") public ApiResponse<?> withdraw(@AuthenticationPrincipal Jwt jwt) {
-        service.withdraw(jwt); return ApiResponse.success(null);
+    @DeleteMapping("/me") public ApiResponse<?> withdraw(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, Object> body) {
+        service.withdraw(jwt, body); return ApiResponse.success(null);
     }
     @GetMapping("/me/settings") public ApiResponse<?> settings(@AuthenticationPrincipal Jwt jwt) { return ApiResponse.success(service.settings(jwt)); }
     @PatchMapping("/me/settings") public ApiResponse<?> settings(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, Object> body) {

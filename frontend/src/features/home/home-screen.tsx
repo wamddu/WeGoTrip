@@ -1,5 +1,5 @@
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { money, shortDate, type Trip } from "../../domain/models";
 import { useTravel } from "../../state/travel-provider";
@@ -104,12 +104,7 @@ const shortcuts: {
   },
 ];
 export function HomeScreen() {
-  const { data, session, error, refresh, tripApi } = useTravel();
-  useFocusEffect(
-    useCallback(() => {
-      if (tripApi) void refresh();
-    }, [tripApi, refresh]),
-  );
+  const { data, session, error, refresh } = useTravel();
   const current = data?.trips.find((t) => !t.archived) ?? data?.trips[0];
   const todos = current?.checklist.filter((c) => !c.done).length ?? 0;
   return (
@@ -228,12 +223,7 @@ export function HomeScreen() {
   );
 }
 export function TripsScreen() {
-  const { data, error, refresh, tripApi } = useTravel();
-  useFocusEffect(
-    useCallback(() => {
-      if (tripApi) void refresh();
-    }, [tripApi, refresh]),
-  );
+  const { data, error } = useTravel();
   const [filter, setFilter] = useState("함께할 여행");
   const trips =
     data?.trips.filter((t) =>

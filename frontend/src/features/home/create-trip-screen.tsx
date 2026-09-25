@@ -10,17 +10,12 @@ import {
   Section,
   styles as s,
 } from "../../ui/components";
-import { Confirm, Page } from "../../ui/shell";
-import type { Preview } from "../../data/trip-api";
+import { Page } from "../../ui/shell";
 import { tripHref } from "./home-screen";
 import { localDate } from "../../domain/models";
 
 export function CreateTripScreen() {
-  const { data, session, execute, busy, tripApi } = useTravel();
-  const [preview, setPreview] = useState<(Preview & { code: string }) | null>(
-    null,
-  );
-  const [checking, setChecking] = useState(false);
+  const { data, session, execute, busy } = useTravel();
   const today = localDate();
   const [mode, setMode] = useState("새 여행");
   const [title, setTitle] = useState("");
@@ -35,16 +30,11 @@ export function CreateTripScreen() {
     data?.users.filter((u) =>
       data.friendships[session!.user.id]?.includes(u.id),
     ) ?? [];
-  async function submit(confirmedCode?: string) {
+  async function submit() {
     setError("");
     try {
-      if (tripApi && mode !== "새 여행" && !confirmedCode) {
-        setChecking(true);
-        setPreview({ ...(await tripApi.preview(code)), code });
-        return;
-      }
       const next = await execute(
-        mode === "새 여행" && !confirmedCode
+        mode === "새 여행"
           ? {
               type: "trip.create",
               input: {
@@ -56,17 +46,13 @@ export function CreateTripScreen() {
                 memberIds: members,
               },
             }
-          : { type: "trip.join", code: confirmedCode ?? code },
+          : { type: "trip.join", code },
       );
       const previous = new Set(data?.trips.map((t) => t.id));
-      const created = tripApi
-        ? next.trips[0]
-        : next.trips.find((t) => !previous.has(t.id));
+      const created = next.trips.find((t) => !previous.has(t.id));
       router.replace(created ? tripHref(created.id) : "/trips");
     } catch (e) {
       setError(e instanceof Error ? e.message : "여행을 저장하지 못했어요.");
-    } finally {
-      setChecking(false);
     }
   }
   return (
@@ -77,9 +63,7 @@ export function CreateTripScreen() {
             key={value}
             title={value}
             active={mode === value}
-            onPress={() => {
-              if (!busy && !checking) setMode(value);
-            }}
+            onPress={() => setMode(value)}
           />
         ))}
       </View>
@@ -118,9 +102,7 @@ export function CreateTripScreen() {
           />
           <Section title="함께할 친구" />
           <Text style={[s.body, { marginBottom: 14 }]}>
-            {tripApi
-              ? "선택한 친구가 초대를 수락하면 함께 참여해요."
-              : "지금 선택하거나, 여행을 만든 뒤 초대할 수 있어요."}
+            지금 선택하거나, 여행을 만든 뒤 초대할 수 있어요.
           </Text>
           <View style={s.wrap}>
             {friends.map((u) => (
@@ -158,24 +140,9 @@ export function CreateTripScreen() {
         <Button
           title={mode === "새 여행" ? "우리 여행 만들기" : "여행 참여하기"}
           onPress={() => void submit()}
-          loading={busy || checking}
+          loading={busy}
         />
       </View>
-      <Confirm
-        visible={!!preview}
-        title={preview?.trip.title ?? "여행 참여"}
-        description={
-          preview
-            ? `${preview.trip.destination} · ${preview.trip.startDate} ~ ${preview.trip.endDate}\n${preview.memberCount}/${preview.maxMembers}명 · 이 여행에 참여할까요?`
-            : ""
-        }
-        onCancel={() => setPreview(null)}
-        onConfirm={() => {
-          const selected = preview;
-          setPreview(null);
-          if (selected) void submit(selected.code);
-        }}
-      />
     </Page>
   );
 }

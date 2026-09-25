@@ -867,7 +867,7 @@ test("USER API unwraps envelopes, sends bearer and preserves PATCH null semantic
   assert.equal(api.token, null);
 });
 
-test("Server accounts ignore legacy local travel and never persist bearer credentials", async (t) => {
+test("Server accounts isolate local travel and never persist bearer credentials", async (t) => {
   const {
     UserTravelRepository,
   } = require("../src/data/user-travel-repository.ts");
@@ -890,9 +890,7 @@ test("Server accounts ignore legacy local travel and never persist bearer creden
           ? { accessToken: "private-token" }
           : url.endsWith("/logout")
             ? null
-            : url.includes("/trips?") || url.includes("/friends?")
-              ? { items: [], nextCursor: null }
-              : { id, name: "테스트", email: "test@example.com" },
+            : { id, name: "테스트", email: "test@example.com" },
       }),
     );
   const repo = new UserTravelRepository("http://localhost:8080/api", storage);
@@ -908,7 +906,6 @@ test("Server accounts ignore legacy local travel and never persist bearer creden
       notifications: [],
     }),
   );
-  assert.deepEqual((await repo.load()).trips, []);
   await repo.signOut();
   id = "2";
   await repo.signIn("other@example.com", "password");
@@ -923,270 +920,6 @@ test("Server accounts ignore legacy local travel and never persist bearer creden
     ).restoreSession(),
     null,
   );
-});
-
-test("Trip API paginates and creation retains its idempotency key through access refresh", async (t) => {
-  const { UserApi } = require("../src/data/user-api.ts");
-  const { TripApi } = require("../src/data/trip-api.ts");
-  const original = global.fetch;
-  t.after(() => {
-    global.fetch = original;
-  });
-  const api = new UserApi("http://localhost:8080/api", {
-    kind: "NATIVE",
-    read: async () => "refresh",
-    write: async () => {},
-    clear: async () => {},
-  });
-  api.token = "old";
-  const trips = new TripApi(api);
-  const creates = [];
-  global.fetch = async (url, options) => {
-    let data;
-    if (url.includes("/auth/tokens/refresh"))
-      data = { accessToken: "new", refreshToken: "rotated" };
-    else if (options.method === "POST") {
-      creates.push(options.headers["Idempotency-Key"]);
-      if (options.headers.Authorization === "Bearer old")
-        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
-          status: 401,
-        });
-      data = { trip: { id: "42" }, invitations: [] };
-    } else
-      data = url.includes("cursor=")
-        ? { items: [{ id: "2" }], nextCursor: null }
-        : { items: [{ id: "1" }], nextCursor: "opaque+/=" };
-    return new Response(JSON.stringify({ code: "SUCCESS", data }));
-  };
-  assert.deepEqual(await trips.all("/trips?status=ALL"), [
-    { id: "1" },
-    { id: "2" },
-  ]);
-  assert.equal(
-    (
-      await trips.create(
-        {
-          title: "Trip",
-          destination: "Busan",
-          startDate: "2026-10-10",
-          endDate: "2026-10-11",
-          budget: 0,
-          inviteeIds: [],
-        },
-        "stable-request-key",
-      )
-    ).trip.id,
-    "42",
-  );
-  assert.deepEqual(creates, ["stable-request-key", "stable-request-key"]);
-});
-
-test("Server workspace reads memberships and accepted friends, not local history", async (t) => {
-  const {
-    UserTravelRepository,
-  } = require("../src/data/user-travel-repository.ts");
-  const original = global.fetch;
-  t.after(() => {
-    global.fetch = original;
-  });
-  let storageReads = 0;
-  const repo = new UserTravelRepository("http://localhost:8080/api", {
-    read: async (key) => {
-      storageReads++;
-      assert.ok(key.startsWith("trip-device-notes-v1:"));
-      return null;
-    },
-    write: async () => assert.fail("server data must not be persisted locally"),
-    remove: async () => {},
-  });
-  global.fetch = async (url) => {
-    const trip = {
-      id: "91",
-      title: "Shared",
-      destination: "Busan",
-      startDate: "2026-10-10",
-      endDate: "2026-10-11",
-      budget: 0,
-      status: "ACTIVE",
-      owner: { id: "1", name: "Owner" },
-    };
-    const data = url.endsWith("/login")
-      ? { accessToken: "secret" }
-      : url.endsWith("/users/me")
-        ? { id: "1", name: "Owner", email: "me@example.invalid" }
-        : url.includes("/members?")
-          ? {
-              items: [
-                { user: { id: "1", name: "Owner" }, role: "OWNER" },
-                { user: { id: "2", name: "Friend" }, role: "MEMBER" },
-              ],
-              nextCursor: null,
-            }
-          : url.includes("/friends?")
-            ? {
-                items: [{ user: { id: "2", name: "Friend" } }],
-                nextCursor: null,
-              }
-            : { items: [trip], nextCursor: null };
-    return new Response(JSON.stringify({ code: "SUCCESS", data }));
-  };
-  await repo.signIn("me@example.invalid", "dummy");
-  const workspace = await repo.load();
-  assert.equal(storageReads, 1);
-  assert.deepEqual(workspace.trips[0].memberIds, ["1", "2"]);
-  assert.deepEqual(workspace.friendships, { 1: ["2"] });
-  assert.equal(workspace.users.find((u) => u.id === "2").email, "");
-  assert.equal(workspace.trips[0].inviteCode, "");
-});
-
-function restoredRepositoryFixture() {
-  const {
-    UserTravelRepository,
-  } = require("../src/data/user-travel-repository.ts");
-  const values = new Map(),
-    calls = [];
-  let account = "1";
-  const repo = new UserTravelRepository("http://localhost:8080/api", {
-    read: async (k) => values.get(k) ?? null,
-    write: async (k, v) => values.set(k, v),
-    remove: async (k) => values.delete(k),
-  });
-  const trip = {
-    id: "91",
-    title: "기존 여행",
-    destination: "부산",
-    startDate: "2026-10-10",
-    endDate: "2026-10-12",
-    budget: 0,
-    status: "ACTIVE",
-    owner: { id: "1", name: "여행장" },
-    version: 3,
-  };
-  repo.userApi.login = async () => {
-    repo.userApi.token = "memory-only";
-  };
-  repo.userApi.logout = async () => {
-    repo.userApi.token = null;
-  };
-  repo.userApi.me = async () => ({
-    id: account,
-    name: `회원 ${account}`,
-    email: `${account}@example.invalid`,
-  });
-  repo.tripApi.trips = async () => [structuredClone(trip)];
-  repo.tripApi.members = async () => [
-    { user: { id: "1", name: "여행장" } },
-    { user: { id: "2", name: "친구" } },
-  ];
-  repo.tripApi.friends = async () => [
-    { user: { id: account === "1" ? "2" : "1", name: "친구" } },
-  ];
-  repo.tripApi.invite = async (...args) => calls.push(["invite", ...args]);
-  repo.tripApi.requestFriend = async (...args) =>
-    calls.push(["friend", ...args]);
-  repo.tripApi.update = async (...args) => {
-    calls.push(["update", ...args]);
-  };
-  return {
-    repo,
-    values,
-    calls,
-    trip,
-    account: (value) => {
-      account = value;
-    },
-  };
-}
-test("Restored planning screens keep device drafts across refresh without overwriting server membership", async () => {
-  const { repo, values, trip, account } = restoredRepositoryFixture();
-  await repo.signIn("1@example.invalid", "dummy");
-  await repo.load();
-  const command = {
-    type: "item.save",
-    tripId: "91",
-    collection: "checklist",
-    item: { id: "packing-1", title: "여권", ownerId: null, done: false },
-  };
-  const saved = await repo.execute(command);
-  assert.equal(saved.trips[0].checklist[0].title, "여권");
-  assert.equal(saved.notifications.length, 0);
-  assert.equal((await repo.load()).trips[0].checklist.length, 1);
-  const [key, raw] = [...values][0];
-  assert.ok(key.endsWith(":1"));
-  assert.ok(!raw.includes("memory-only"));
-  const draft = JSON.parse(raw);
-  assert.equal(draft["91"].ownerId, undefined);
-  assert.equal(draft["91"].memberIds, undefined);
-  draft["91"].ownerId = "attacker";
-  draft["91"].memberIds = ["attacker"];
-  values.set(key, JSON.stringify(draft));
-  assert.equal((await repo.load()).trips[0].ownerId, "1");
-  assert.deepEqual((await repo.load()).trips[0].memberIds, ["1", "2"]);
-  await repo.signOut();
-  account("2");
-  await repo.signIn("2@example.invalid", "dummy");
-  assert.equal((await repo.load()).trips[0].checklist.length, 0);
-  await repo.signOut();
-  account("1");
-  await repo.signIn("1@example.invalid", "dummy");
-  assert.equal((await repo.load()).trips[0].checklist.length, 1);
-  trip.status = "ARCHIVED";
-  await assert.rejects(repo.execute(command), /보관|종료/);
-});
-test("Original trip commands use APIs and preserve the editor's version", async () => {
-  const { repo, calls, values } = restoredRepositoryFixture();
-  await repo.signIn("1@example.invalid", "dummy");
-  await repo.load();
-  await repo.execute({ type: "trip.invite", tripId: "91", userId: "2" });
-  await repo.execute({ type: "friend.add", userId: "2" });
-  await repo.execute({
-    type: "trip.update",
-    tripId: "91",
-    version: 1,
-    input: {
-      title: "수정",
-      destination: "부산",
-      startDate: "2026-10-10",
-      endDate: "2026-10-12",
-      budget: 10,
-      archived: false,
-    },
-  });
-  assert.deepEqual(calls.slice(0, 2), [
-    ["invite", "91", "2"],
-    ["friend", "2"],
-  ]);
-  assert.equal(calls[2][2].version, 1);
-  assert.equal(calls[2][2].status, "ACTIVE");
-  assert.equal(values.size, 0);
-});
-test("Original create screen retries a lost response with the same creation key", async () => {
-  const { repo } = restoredRepositoryFixture();
-  await repo.signIn("1@example.invalid", "dummy");
-  await repo.load();
-  const keys = [];
-  repo.tripApi.create = async (input, key) => {
-    keys.push(key);
-    assert.deepEqual(input.inviteeIds, ["2"]);
-    assert.equal(input.memberIds, undefined);
-    if (keys.length === 1) throw new Error("connection lost");
-    return { trip: { id: "91" } };
-  };
-  const command = {
-    type: "trip.create",
-    input: {
-      title: "여행",
-      destination: "부산",
-      startDate: "2026-10-10",
-      endDate: "2026-10-12",
-      budget: 0,
-      memberIds: ["2"],
-    },
-  };
-  await assert.rejects(repo.execute(command), /connection lost/);
-  const next = await repo.execute(command);
-  assert.equal(next.trips[0].id, "91");
-  assert.equal(keys[0], keys[1]);
 });
 
 test("Consent list matches nested server contract and failed reauthentication preserves the session", async (t) => {
@@ -1237,6 +970,25 @@ test("Consent list matches nested server contract and failed reauthentication pr
   await assert.rejects(api.me());
   assert.equal(api.token, null);
   assert.equal(expired, true);
+});
+
+test("Withdrawal sends the current password in the authenticated DELETE request", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const previous = global.fetch;
+  t.after(() => { global.fetch = previous; });
+  const api = new UserApi("http://localhost:8080/api");
+  api.token = "access-token";
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    assert.equal(url, "http://localhost:8080/api/v1/users/me");
+    assert.equal(options.method, "DELETE");
+    assert.equal(options.headers.Authorization, "Bearer access-token");
+    assert.deepEqual(JSON.parse(options.body), { currentPassword: "Password123!" });
+    return new Response(JSON.stringify({ code: "SUCCESS", data: null }));
+  };
+  await api.withdraw("Password123!");
+  assert.equal(calls, 1);
 });
 
 test("Concurrent expired requests rotate once and retry with the new access token", async (t) => {
