@@ -17,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 @Transactional
 public class UserService {
     private final UserRepository users;
-    private final RefreshCredentialRepository refreshCredentials;
     private final UserSettingRepository settings;
     private final UserDeviceRepository devices;
     private final UserConsentRepository consents;
@@ -25,14 +24,11 @@ public class UserService {
     private final BankCipher bank;
     private final Clock clock;
     private final String consentVersion;
-    private final com.travel.travelbackend.tripapi.TripService trips;
     public UserService(UserRepository users, UserSettingRepository settings, UserDeviceRepository devices,
                        UserConsentRepository consents, PasswordEncoder passwords, BankCipher bank, Clock clock,
-                       @Value("${users.consent-version:1.0}") String consentVersion,
-                       com.travel.travelbackend.tripapi.TripService trips, RefreshCredentialRepository refreshCredentials) {
+                       @Value("${users.consent-version:1.0}") String consentVersion) {
         this.users = users; this.settings = settings; this.devices = devices; this.consents = consents;
         this.passwords = passwords; this.bank = bank; this.clock = clock; this.consentVersion = consentVersion;
-        this.trips = trips; this.refreshCredentials = refreshCredentials;
     }
     public record Created(String id, String email, String name, Instant createdAt) {}
     public record Profile(String id, String email, String name, String role, String status, String loginProvider,
@@ -125,12 +121,7 @@ public class UserService {
             throw new ApiException(400, "CURRENT_PASSWORD_MISMATCH", "현재 비밀번호가 일치하지 않습니다.");
         user.withdraw(passwords.encode(UUID.randomUUID().toString()), clock.instant());
         devices.deleteByUserId(user.getId());
-        consents.deleteAll(consents.findByUserIdOrderByAgreedAtDescIdDesc(user.getId()));
-        settings.findById(user.getId()).ifPresent(settings::delete);
-        // Flush dependent deletes before removing the referenced user.
-        users.flush();
-        users.delete(user);
-        users.flush();
+        settings.findById(user.getId()).ifPresent(setting -> setting.update(false, false));
     }
     public Settings settings(Jwt jwt) {
         User user = current(jwt);

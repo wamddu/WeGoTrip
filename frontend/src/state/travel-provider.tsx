@@ -15,7 +15,6 @@ import { PushPermissionPrompt } from "../notifications/permission-prompt";
 type TravelContext = {
   push: ReturnType<typeof useDeviceRegistration>;
   userApi?: import("../data/user-api").UserApi;
-  tripApi?: import("../data/trip-api").TripApi;
   session: Session | null;
   data: Workspace | null;
   loading: boolean;
@@ -161,7 +160,6 @@ export function TravelProvider({ children }: PropsWithChildren) {
       value={{
         push,
         userApi: repository.userApi,
-        tripApi: repository.tripApi,
         session,
         data,
         loading,

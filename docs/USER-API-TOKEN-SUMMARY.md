@@ -12,7 +12,7 @@
 | 내 정보 조회 | GET /users/me | 프로필, 본인의 전체 계좌번호(bankAccountNumber) |
 | 내 정보 수정 | PATCH /users/me | name, bankAccountNumber |
 | 비밀번호 변경 | PUT /users/me/password | currentPassword, newPassword |
-| 회원 탈퇴 | DELETE /users/me | 최근 5분 내 비밀번호 로그인 필요, 회원 행 물리 삭제 |
+| 회원 탈퇴 | DELETE /users/me | 최근 5분 내 비밀번호 로그인 필요 |
 | 설정 조회 | GET /users/me/settings | 푸시 알림·위치 공유 설정 |
 | 설정 수정 | PATCH /users/me/settings | pushNotificationEnabled, locationSharingEnabled |
 | 기기 등록/갱신 | POST /users/me/devices | fcmToken, deviceType, 선택 deviceId |
@@ -79,7 +79,7 @@ Refresh 저장 테이블에는 회원 ID, tokenVersion, 최초 인증·만료 �
 4. 앱 시작·웹 새로고침 → 저장된 refresh token으로 로그인 복원을 시도한다.
 5. 재발급 실패·응답 유실 → 자동 재발급 재시도를 중단하고 로컬 로그인을 해제한다.
 
-**tokenVersion**은 회원별 세션 버전 번호다. 서버는 토큰 발급 당시 버전과 회원의 현재 버전을 비교한다. 로그아웃·비밀번호 변경 시 버전을 증가시켜 **모든 기기의 기존 access/refresh token을 무효화**한다.
+**tokenVersion**은 회원별 세션 버전 번호다. 서버는 토큰 발급 당시 버전과 회원의 현재 버전을 비교한다. 로그아웃·비밀번호 변경·탈퇴 시 버전을 증가시켜 **모든 기기의 기존 access/refresh token을 무효화**한다.
 
 이미 사용한 refresh token이 같은 버전에서 다시 제출되면 재사용으로 판단해 기존 세션 전체를 무효화한다. 갱신은 JWT의 `auth_time`을 새로 만들지 않으므로 회원 탈퇴에 필요한 최근 비밀번호 인증을 대신할 수 없다.
 
@@ -96,9 +96,3 @@ Refresh 저장 테이블에는 회원 ID, tokenVersion, 최초 인증·만료 �
 백엔드 21개·프론트엔드 34개 테스트, web/Android/iOS 번들 검증, 실제 DB 재발급 및 브라우저 로그인 복원을 확인했다. 모바일 실기기 SecureStore 검증과 만료된 refresh 레코드의 자동 정리 작업은 남아 있다.
 
 상세 구현: [토큰 재발급 구현 문서](AUTH-REFRESH-2026-09-21.md).
-
-## 회원 탈퇴의 실제 삭제 (2026-09-25)
-
-`DELETE /users/me`는 회원·설정·기기·동의·refresh credential과 친구/초대 관계를 삭제한다. 기존 access token은 회원이 존재하지 않아 거절되고 refresh token도 사용할 수 없다. 같은 이메일로 재가입하면 새로운 회원 ID가 발급된다. 다른 멤버가 있는 ACTIVE 여행장은 먼저 여행을 보관해야 한다. 보관된 여행은 유지하고 여행장 연결을 해제한다 (`owner.id`는 빈 문자열, 이름은 `탈퇴한 사용자`).
-
-DB에는 `backend/db/migrations/007-user-hard-delete.sql`을 서버 배포 전에 적용한다. 기존 WITHDRAWN 행은 이번 변경으로 일괄 삭제하지 않는다.
