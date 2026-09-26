@@ -1,4 +1,5 @@
 import type { UserApi } from "./user-api";
+import type { Party } from "../domain/models";
 export interface PublicUser {
   id: string;
   name: string;
@@ -109,6 +110,24 @@ export class TripApi {
   }
   members(id: string) {
     return this.all<Member>(`/trips/${id}/members`);
+  }
+  parties(tripId: string) {
+    return this.all<Party>(`/trips/${tripId}/parties`);
+  }
+  createParty(tripId: string, input: Omit<Party, "id">, key: string) {
+    return this.api.request<Party>(`/trips/${tripId}/parties`, "POST", input, {
+      "Idempotency-Key": key,
+    });
+  }
+  updateParty(tripId: string, partyId: string, input: Omit<Party, "id">) {
+    return this.api.request<Party>(
+      `/trips/${tripId}/parties/${partyId}`,
+      "PUT",
+      input,
+    );
+  }
+  removeParty(tripId: string, partyId: string) {
+    return this.api.request(`/trips/${tripId}/parties/${partyId}`, "DELETE");
   }
   create(input: TripInput, key: string) {
     return this.api.request<{ trip: TripDetail; invitations: unknown[] }>(

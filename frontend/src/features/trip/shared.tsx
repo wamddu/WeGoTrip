@@ -38,14 +38,10 @@ export function DateFilter() {
     </ScrollView>
   );
 }
-export function PartyFilter({
-  includeDate = false,
-}: {
-  includeDate?: boolean;
-}) {
-  const { trip, partyId, setPartyId, date } = useTrip();
+export function PartyFilter() {
+  const { trip, partyId, setPartyId } = useTrip();
   if (!trip?.parties.length) return null;
-  const parties = trip.parties.filter((p) => !includeDate || p.date === date);
+  const parties = trip.parties;
   return (
     <View style={[s.wrap, { marginBottom: 15 }]}>
       <Chip title="전체" active={!partyId} onPress={() => setPartyId(null)} />

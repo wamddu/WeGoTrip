@@ -13,6 +13,7 @@ export class UserTravelRepository implements TravelRepository {
   private session: Session | null = null;
   private snapshot: Workspace | null = null;
   private pendingCreate: { body: string; key: string } | null = null;
+  private pendingPartyCreate: { body: string; key: string } | null = null;
   constructor(
     private baseUrl: string,
     private storage: KeyValueStorage,
@@ -34,6 +35,7 @@ export class UserTravelRepository implements TravelRepository {
       const profile = await this.userApi.me();
       this.snapshot = null;
       this.pendingCreate = null;
+      this.pendingPartyCreate = null;
       this.session = {
         user: {
           id: profile.id,
@@ -49,6 +51,7 @@ export class UserTravelRepository implements TravelRepository {
       this.session = null;
       this.snapshot = null;
       this.pendingCreate = null;
+      this.pendingPartyCreate = null;
       throw error;
     }
   }
@@ -62,6 +65,7 @@ export class UserTravelRepository implements TravelRepository {
       this.session = null;
       this.snapshot = null;
       this.pendingCreate = null;
+      this.pendingPartyCreate = null;
     }
   }
   async load(): Promise<Workspace> {
@@ -87,7 +91,10 @@ export class UserTravelRepository implements TravelRepository {
       users.set(user.id, { ...user, email: "", color: "#D8ECFF" });
     const mapped: Workspace["trips"] = [];
     for (const t of trips) {
-      const members = await this.tripApi.members(t.id);
+      const [members, parties] = await Promise.all([
+        this.tripApi.members(t.id),
+        this.tripApi.parties(t.id),
+      ]);
       for (const { user } of members)
         users.set(
           user.id,
@@ -107,7 +114,7 @@ export class UserTravelRepository implements TravelRepository {
         archived: t.status === "ARCHIVED",
         inviteCode: "",
         serverVersion: t.version,
-        parties: [],
+        parties,
         places: [],
         agenda: [],
         expenses: [],
@@ -142,6 +149,42 @@ export class UserTravelRepository implements TravelRepository {
     if (!session) throw new Error("로그인이 필요해요.");
     const current = this.snapshot ?? (await this.load());
     if (this.session !== session) throw new Error("로그인 정보가 변경됐어요.");
+    if (
+      (command.type === "item.save" || command.type === "item.delete") &&
+      command.collection === "parties"
+    ) {
+      // Keep the existing editor, but use server IDs and server-owned subgroup membership.
+      applyCommand(current, session.user.id, command);
+      if (command.type === "item.delete") {
+        await this.tripApi.removeParty(command.tripId, command.itemId);
+      } else {
+        const input = {
+          name: command.item.name.trim(),
+          memberIds: [...command.item.memberIds].sort(),
+        };
+        if (/^[1-9][0-9]*$/.test(command.item.id)) {
+          await this.tripApi.updateParty(
+            command.tripId,
+            command.item.id,
+            input,
+          );
+        } else {
+          const body = JSON.stringify([command.tripId, input]);
+          if (this.pendingPartyCreate?.body !== body)
+            this.pendingPartyCreate = { body, key: requestKey() };
+          await this.tripApi.createParty(
+            command.tripId,
+            input,
+            this.pendingPartyCreate.key,
+          );
+        }
+      }
+      if (this.session !== session)
+        throw new Error("로그인 정보가 변경됐어요.");
+      const next = await this.load();
+      this.pendingPartyCreate = null;
+      return next;
+    }
     let selectedId: string | undefined;
     switch (command.type) {
       case "trip.create": {
@@ -204,9 +247,10 @@ export class UserTravelRepository implements TravelRepository {
         const drafts = raw ? JSON.parse(raw) : {};
         if ("tripId" in command) {
           const trip = next.trips.find((t) => t.id === command.tripId)!;
-          drafts[trip.id] = Object.fromEntries(
-            localCollections.map((k) => [k, trip[k]]),
-          );
+          drafts[trip.id] = {
+            ...drafts[trip.id],
+            ...Object.fromEntries(localCollections.map((k) => [k, trip[k]])),
+          };
           await this.storage.write(key, JSON.stringify(drafts));
         }
         // Local changes must not create invitations or notices for other accounts.
@@ -228,7 +272,6 @@ export class UserTravelRepository implements TravelRepository {
   }
 }
 const localCollections = [
-  "parties",
   "places",
   "agenda",
   "expenses",

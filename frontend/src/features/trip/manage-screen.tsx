@@ -176,15 +176,14 @@ export default function ManageScreen() {
         onPress={() => router.push(editHref(trip.id, "parties"))}
       />
       {tripApi && (
-        <Text style={s.small}>파티와 일정은 현재 이 기기에만 저장돼요.</Text>
+        <Text style={s.small}>
+          파티는 여행 멤버와 공유돼요. 일정은 현재 이 기기에만 저장돼요.
+        </Text>
       )}
       {trip.parties.map((party) => (
         <View key={party.id} style={{ marginBottom: 12 }}>
           <Card>
             <Text style={s.strong}>{party.name}</Text>
-            <Text style={s.small}>
-              {party.date} · {party.startTime}–{party.endTime}
-            </Text>
             <Text style={s.body}>
               {data!.users
                 .filter((u) => party.memberIds.includes(u.id))

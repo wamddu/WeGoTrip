@@ -18,6 +18,7 @@ const {
   equalShares,
   calculateSettlement,
   datesBetween,
+  selectHomeTrip,
 } = require("../src/domain/models.ts");
 const {
   createSeedWorkspace,
@@ -29,6 +30,64 @@ const { searchPlaces } = require("../src/data/place-search.ts");
 const {
   DeviceRegistration,
 } = require("../src/notifications/device-registration.ts");
+
+function homeTrip(id, startDate, endDate = startDate, archived = false) {
+  return {
+    ...createSeedWorkspace().trips[0],
+    id,
+    startDate,
+    endDate,
+    archived,
+  };
+}
+
+test("Home selects the nearest upcoming unarchived departure without reordering trips", () => {
+  const trips = [
+    homeTrip("later", "2026-11-01"),
+    homeTrip("past", "2026-09-25"),
+    homeTrip("archived", "2026-09-27", "2026-09-28", true),
+    homeTrip("nearest", "2026-09-28"),
+    homeTrip("same-day", "2026-09-28"),
+  ];
+  const before = structuredClone(trips);
+  assert.equal(selectHomeTrip(trips, "2026-09-26").id, "nearest");
+  assert.deepEqual(trips, before);
+});
+
+test("Home prioritizes ongoing trips over today's and future departures", () => {
+  const trips = [
+    homeTrip("tomorrow", "2026-09-27"),
+    homeTrip("today", "2026-09-26"),
+    homeTrip("archived-ongoing", "2026-09-20", "2026-09-30", true),
+    homeTrip("ongoing", "2026-09-25", "2026-09-28"),
+    homeTrip("earlier-ongoing", "2026-09-24", "2026-09-26"),
+  ];
+  assert.equal(selectHomeTrip(trips, "2026-09-26").id, "earlier-ongoing");
+});
+
+test("Home includes departure and end dates and switches trips after the end date", () => {
+  const trips = [
+    homeTrip("next", "2026-09-29"),
+    homeTrip("current", "2026-09-26", "2026-09-27"),
+  ];
+  assert.equal(selectHomeTrip(trips, "2026-09-26").id, "current");
+  assert.equal(selectHomeTrip(trips, "2026-09-27").id, "current");
+  assert.equal(selectHomeTrip(trips, "2026-09-28").id, "next");
+});
+
+test("Home has no featured trip when only finished or archived trips remain", () => {
+  assert.equal(selectHomeTrip([], "2026-09-26"), undefined);
+  assert.equal(
+    selectHomeTrip(
+      [
+        homeTrip("finished", "2026-09-23", "2026-09-25"),
+        homeTrip("archived", "2026-10-01", "2026-10-02", true),
+      ],
+      "2026-09-26",
+    ),
+    undefined,
+  );
+});
 
 function pushFixture(permission = "undetermined") {
   const values = new Map(),
@@ -600,14 +659,28 @@ test("새 여행에 생성자를 포함하고 멤버 중복을 제거", () => {
   assert.equal(next.trips[0].ownerId, "jiwoo");
   assert.ok(next.trips[0].inviteCode);
 });
-test("파티의 시간 밖 일정과 기존 일정을 제외하는 기간 수정을 차단", () => {
+test("소그룹 일정은 여행 기간 안에서 날짜와 시간을 자유롭게 선택", () => {
   const agenda = seed().trips[0].agenda[2];
+  const next = applyCommand(
+    seed(),
+    "jiwoo",
+    save("agenda", {
+      ...agenda,
+      date: "2026-09-20",
+      startTime: "09:00",
+      endTime: "10:00",
+    }),
+  );
+  assert.equal(
+    next.trips[0].agenda.find((a) => a.id === agenda.id).date,
+    "2026-09-20",
+  );
   assert.throws(
     () =>
       applyCommand(
         seed(),
         "jiwoo",
-        save("agenda", { ...agenda, startTime: "13:00" }),
+        save("agenda", { ...agenda, partyId: "missing" }),
       ),
     /파티/,
   );
@@ -616,23 +689,34 @@ test("파티의 시간 밖 일정과 기존 일정을 제외하는 기간 수정
       applyCommand(
         seed(),
         "jiwoo",
-        save("agenda", { ...agenda, date: "2026-09-20" }),
+        save("agenda", { ...agenda, date: "2026-09-25" }),
       ),
-    /파티/,
+    /날짜/,
   );
   assert.throws(
     () => applyCommand(seed(), "jiwoo", update({ startDate: "2026-09-20" })),
     /기존/,
   );
-  const party = seed().trips[0].parties[0];
+  const party = { id: "new-group", name: "산책팀", memberIds: ["jiwoo"] };
+  assert.deepEqual(
+    applyCommand(seed(), "jiwoo", save("parties", party)).trips[0].parties.at(
+      -1,
+    ),
+    party,
+  );
   assert.throws(
     () =>
       applyCommand(
         seed(),
         "jiwoo",
-        save("parties", { ...party, endTime: "15:00" }),
+        save("parties", { ...party, name: "x".repeat(51) }),
       ),
-    /일정/,
+    /파티/,
+  );
+  const withoutAgenda = seed();
+  withoutAgenda.trips[0].agenda = [];
+  assert.doesNotThrow(() =>
+    applyCommand(withoutAgenda, "jiwoo", update({ startDate: "2026-09-20" })),
   );
 });
 test("지출 합계와 분담 멤버를 검증하며 파티 변경이 과거 분담에 영향 없음", () => {
@@ -1027,7 +1111,12 @@ test("Server workspace reads memberships and accepted friends, not local history
                 items: [{ user: { id: "2", name: "Friend" } }],
                 nextCursor: null,
               }
-            : { items: [trip], nextCursor: null };
+            : url.includes("/parties?")
+              ? {
+                  items: [{ id: "301", name: "카페팀", memberIds: ["1", "2"] }],
+                  nextCursor: null,
+                }
+              : { items: [trip], nextCursor: null };
     return new Response(JSON.stringify({ code: "SUCCESS", data }));
   };
   await repo.signIn("me@example.invalid", "dummy");
@@ -1037,6 +1126,9 @@ test("Server workspace reads memberships and accepted friends, not local history
   assert.deepEqual(workspace.friendships, { 1: ["2"] });
   assert.equal(workspace.users.find((u) => u.id === "2").email, "");
   assert.equal(workspace.trips[0].inviteCode, "");
+  assert.deepEqual(workspace.trips[0].parties, [
+    { id: "301", name: "카페팀", memberIds: ["1", "2"] },
+  ]);
 });
 
 function restoredRepositoryFixture() {
@@ -1074,6 +1166,7 @@ function restoredRepositoryFixture() {
     email: `${account}@example.invalid`,
   });
   repo.tripApi.trips = async () => [structuredClone(trip)];
+  repo.tripApi.parties = async () => [];
   repo.tripApi.members = async () => [
     { user: { id: "1", name: "여행장" } },
     { user: { id: "2", name: "친구" } },
@@ -1133,6 +1226,154 @@ test("Restored planning screens keep device drafts across refresh without overwr
   trip.status = "ARCHIVED";
   await assert.rejects(repo.execute(command), /보관|종료/);
 });
+test("Party create/update/delete use the server, survive another account, and preserve old local drafts", async () => {
+  const { repo, values, account } = restoredRepositoryFixture();
+  let parties = [];
+  const calls = [];
+  repo.tripApi.parties = async () => structuredClone(parties);
+  repo.tripApi.createParty = async (tripId, input, key) => {
+    calls.push(["create", tripId, input, key]);
+    const party = { id: "301", ...input };
+    parties.push(party);
+    return party;
+  };
+  repo.tripApi.updateParty = async (tripId, id, input) => {
+    calls.push(["update", tripId, id, input]);
+    parties = [{ id, ...input }];
+    return parties[0];
+  };
+  repo.tripApi.removeParty = async (tripId, id) => {
+    calls.push(["delete", tripId, id]);
+    parties = [];
+  };
+  await repo.signIn("1@example.invalid", "dummy");
+  await repo.load();
+  const saveParty = (item) => ({
+    type: "item.save",
+    tripId: "91",
+    collection: "parties",
+    item,
+  });
+  const created = await repo.execute(
+    saveParty({ id: "local-new", name: " 카페팀 ", memberIds: ["2", "1"] }),
+  );
+  assert.deepEqual(created.trips[0].parties, [
+    { id: "301", name: "카페팀", memberIds: ["1", "2"] },
+  ]);
+  assert.equal(values.size, 0);
+  assert.deepEqual(calls[0].slice(0, 3), [
+    "create",
+    "91",
+    { name: "카페팀", memberIds: ["1", "2"] },
+  ]);
+  await repo.signOut();
+  account("2");
+  await repo.signIn("2@example.invalid", "dummy");
+  assert.equal((await repo.load()).trips[0].parties[0].id, "301");
+  const updated = await repo.execute(
+    saveParty({ id: "301", name: "산책팀", memberIds: ["2"] }),
+  );
+  assert.deepEqual(updated.trips[0].parties[0].memberIds, ["2"]);
+  await repo.execute({
+    type: "item.save",
+    tripId: "91",
+    collection: "checklist",
+    item: { id: "pack", title: "물", done: false, ownerId: null },
+  });
+  const [key, raw] = [...values][0];
+  const old = JSON.parse(raw);
+  old["91"].parties = [
+    { id: "legacy", name: "예전 기기 파티", memberIds: ["1"] },
+  ];
+  values.set(key, JSON.stringify(old));
+  assert.deepEqual((await repo.load()).trips[0].parties, parties);
+  await repo.execute({
+    type: "item.save",
+    tripId: "91",
+    collection: "checklist",
+    item: { id: "pack", title: "물", done: true, ownerId: null },
+  });
+  assert.equal(JSON.parse(values.get(key))["91"].parties[0].id, "legacy");
+  const removed = await repo.execute({
+    type: "item.delete",
+    tripId: "91",
+    collection: "parties",
+    itemId: "301",
+  });
+  assert.deepEqual(removed.trips[0].parties, []);
+  assert.deepEqual(calls.at(-1), ["delete", "91", "301"]);
+});
+
+test("Party retries reuse a creation key after a lost response or a failed reload", async () => {
+  const { repo } = restoredRepositoryFixture();
+  await repo.signIn("1@example.invalid", "dummy");
+  await repo.load();
+  const keys = [];
+  let failReload = false;
+  repo.tripApi.createParty = async (tripId, input, key) => {
+    keys.push(key);
+    if (keys.length === 1) throw new Error("lost response");
+    failReload = keys.length === 2;
+    return { id: "301", ...input };
+  };
+  repo.tripApi.parties = async () => {
+    if (failReload) {
+      failReload = false;
+      throw new Error("reload failed");
+    }
+    return [{ id: "301", name: "카페팀", memberIds: ["1"] }];
+  };
+  const save = (id) => ({
+    type: "item.save",
+    tripId: "91",
+    collection: "parties",
+    item: { id, name: "카페팀", memberIds: ["1"] },
+  });
+  await assert.rejects(repo.execute(save("draft-1")), /lost response/);
+  await assert.rejects(repo.execute(save("draft-2")), /reload failed/);
+  assert.equal(
+    (await repo.execute(save("draft-3"))).trips[0].parties[0].id,
+    "301",
+  );
+  assert.equal(new Set(keys).size, 1);
+  await repo.execute(save("draft-4"));
+  assert.notEqual(keys[3], keys[2]);
+});
+
+test("Party API uses existing subgroup fields and the correct nested paths", async (t) => {
+  const { UserApi } = require("../src/data/user-api.ts");
+  const { TripApi } = require("../src/data/trip-api.ts");
+  const previous = global.fetch;
+  t.after(() => {
+    global.fetch = previous;
+  });
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, ...options });
+    return new Response(
+      JSON.stringify({
+        code: "SUCCESS",
+        data:
+          options.method === "GET"
+            ? { items: [], nextCursor: null }
+            : { id: "301" },
+      }),
+    );
+  };
+  const api = new TripApi(new UserApi("http://test/api"));
+  const input = { name: "카페팀", memberIds: ["1", "2"] };
+  await api.parties("91");
+  await api.createParty("91", input, "retry-key");
+  await api.updateParty("91", "301", input);
+  await api.removeParty("91", "301");
+  assert.ok(calls[0].url.endsWith("/v1/trips/91/parties?limit=100"));
+  assert.equal(calls[1].headers["Idempotency-Key"], "retry-key");
+  assert.deepEqual(JSON.parse(calls[1].body), input);
+  assert.equal(calls[2].method, "PUT");
+  assert.ok(calls[2].url.endsWith("/v1/trips/91/parties/301"));
+  assert.equal(calls[3].method, "DELETE");
+});
+
 test("Original trip commands use APIs and preserve the editor's version", async () => {
   const { repo, calls, values } = restoredRepositoryFixture();
   await repo.signIn("1@example.invalid", "dummy");

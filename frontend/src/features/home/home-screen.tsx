@@ -1,7 +1,13 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { money, shortDate, type Trip } from "../../domain/models";
+import {
+  money,
+  localDate,
+  selectHomeTrip,
+  shortDate,
+  type Trip,
+} from "../../domain/models";
 import { useTravel } from "../../state/travel-provider";
 import {
   Avatar,
@@ -110,7 +116,7 @@ export function HomeScreen() {
       if (tripApi) void refresh();
     }, [tripApi, refresh]),
   );
-  const current = data?.trips.find((t) => !t.archived) ?? data?.trips[0];
+  const current = selectHomeTrip(data?.trips ?? []);
   const todos = current?.checklist.filter((c) => !c.done).length ?? 0;
   return (
     <Page
@@ -142,7 +148,11 @@ export function HomeScreen() {
         />
       )}
       <Section
-        title="기다려지는 우리 여행"
+        title={
+          current && current.startDate <= localDate()
+            ? "지금 함께하는 여행"
+            : "기다려지는 우리 여행"
+        }
         action="전체 보기"
         onPress={() => router.push("/trips")}
       />
@@ -150,7 +160,11 @@ export function HomeScreen() {
         <TripCard trip={current} />
       ) : (
         <Empty
-          title="첫 여행을 만들어 보세요"
+          title={
+            data?.trips.length
+              ? "진행 중이거나 예정된 여행이 없어요"
+              : "첫 여행을 만들어 보세요"
+          }
           description="친구들과 함께 일정을 채워 나가요."
           action="여행 만들기"
           onPress={() => router.push("/trip/new")}

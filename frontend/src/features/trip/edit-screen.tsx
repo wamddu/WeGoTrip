@@ -111,11 +111,11 @@ function Editor({
   const [form, setForm] = useState<Record<string, string>>({
     title: string("title", string("name")),
     destination: string("destination"),
-    date: string("date", defaultParty?.date ?? date),
+    date: string("date", date),
     startDate: string("startDate", trip.startDate),
     endDate: string("endDate", trip.endDate),
-    startTime: string("startTime", defaultParty?.startTime ?? "09:00"),
-    endTime: string("endTime", defaultParty?.endTime ?? "10:00"),
+    startTime: string("startTime", "09:00"),
+    endTime: string("endTime", "10:00"),
     amount: string("amount"),
     budget: string("budget", String(trip.budget)),
     address: string("address"),
@@ -317,9 +317,6 @@ function Editor({
               id,
               name: form.title.trim(),
               memberIds: selectedMembers,
-              date: form.date,
-              startTime: form.startTime,
-              endTime: form.endTime,
             },
           };
           break;
@@ -369,13 +366,6 @@ function Editor({
     setSelectedParty(id);
     const party = trip.parties.find((p) => p.id === id);
     if (party && kind === "expenses") setSelectedMembers([...party.memberIds]);
-    if (party && kind === "agenda" && !itemId)
-      setForm((current) => ({
-        ...current,
-        date: party.date,
-        startTime: party.startTime,
-        endTime: party.endTime,
-      }));
   }
   return (
     <Page
@@ -395,9 +385,9 @@ function Editor({
               ? "여행 이름"
               : `${titles[kind]} 제목`,
         )}
-      {(kind === "agenda" || kind === "parties" || kind === "expenses") &&
+      {(kind === "agenda" || kind === "expenses") &&
         field("date", "날짜 (YYYY-MM-DD)")}
-      {(kind === "agenda" || kind === "parties") && (
+      {kind === "agenda" && (
         <>
           <View style={s.row}>
             <View style={s.flex}>
@@ -667,11 +657,13 @@ function Editor({
         </>
       )}
       <ErrorMessage message={error} />
-      {trip.serverVersion !== undefined && kind !== "settings" && (
-        <Text style={s.small}>
-          이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
-        </Text>
-      )}
+      {trip.serverVersion !== undefined &&
+        kind !== "settings" &&
+        kind !== "parties" && (
+          <Text style={s.small}>
+            이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
+          </Text>
+        )}
       <View style={{ gap: 12, marginTop: 28 }}>
         <Button
           title="저장하기"

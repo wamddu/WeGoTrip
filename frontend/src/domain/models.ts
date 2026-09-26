@@ -8,9 +8,6 @@ export interface Party {
   id: string;
   name: string;
   memberIds: string[];
-  date: string;
-  startTime: string;
-  endTime: string;
 }
 export interface Coordinates {
   latitude: number;
@@ -159,6 +156,18 @@ export const money = (amount: number) => `${amount.toLocaleString("ko-KR")}원`;
 export const shortDate = (date: string) => date.slice(5).replace("-", ".");
 export const localDate = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+export function selectHomeTrip(
+  trips: readonly Trip[],
+  today = localDate(),
+): Trip | undefined {
+  let next: Trip | undefined;
+  for (const trip of trips) {
+    if (trip.archived || trip.endDate < today) continue;
+    // Ongoing trips start before upcoming trips; ties keep the original order.
+    if (!next || trip.startDate < next.startDate) next = trip;
+  }
+  return next;
+}
 export function datesBetween(start: string, end: string): string[] {
   const valid = (s: string) =>
     /^\d{4}-\d{2}-\d{2}$/.test(s) &&

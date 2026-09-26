@@ -81,11 +81,11 @@ export function applyCommand(
     ensure(trip.ownerId === userId, "여행장만 여행 정보를 수정할 수 있어요.");
     validateTrip(command.input);
     ensure(
-      [...trip.agenda, ...trip.parties].every(
+      trip.agenda.every(
         (a) =>
           a.date >= command.input.startDate && a.date <= command.input.endDate,
       ),
-      "기존 일정과 파티 활동일을 포함하도록 기간을 설정해 주세요.",
+      "기존 일정을 포함하도록 기간을 설정해 주세요.",
     );
     Object.assign(trip, command.input);
   } else if (command.type === "trip.invite" && trip) {
@@ -160,42 +160,17 @@ export function applyCommand(
         "장소를 다시 선택해 주세요.",
       );
       const party = trip.parties.find((p) => p.id === a.partyId);
-      ensure(
-        !a.partyId ||
-          (party &&
-            party.date === a.date &&
-            a.startTime >= party.startTime &&
-            a.endTime <= party.endTime),
-        "파티의 활동 날짜와 시간 안에 일정을 등록해 주세요.",
-      );
+      ensure(!a.partyId || party, "파티를 다시 선택해 주세요.");
       section = "schedule";
       notificationTitle = "여행 일정이 업데이트되었어요";
     } else if (collection === "parties") {
       const p = command.item;
       ensure(
-        text(p.name) &&
+        text(p.name, 50) &&
           p.memberIds.length &&
           new Set(p.memberIds).size === p.memberIds.length &&
           p.memberIds.every(isMember),
         "파티 이름과 멤버를 확인해 주세요.",
-      );
-      ensure(
-        isTripDate(p.date) &&
-          clock(p.startTime) &&
-          clock(p.endTime) &&
-          p.startTime < p.endTime,
-        "파티 활동 날짜와 시간을 확인해 주세요.",
-      );
-      ensure(
-        trip.agenda
-          .filter((a) => a.partyId === p.id)
-          .every(
-            (a) =>
-              a.date === p.date &&
-              a.startTime >= p.startTime &&
-              a.endTime <= p.endTime,
-          ),
-        "파티에 등록된 일정의 날짜와 시간을 포함해 주세요.",
       );
     } else if (collection === "places") {
       ensure(

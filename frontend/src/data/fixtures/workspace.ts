@@ -58,17 +58,11 @@ export function createSeedWorkspace(): Workspace {
             id: "cafe",
             name: "카페 탐방팀",
             memberIds: ["jiwoo", "seoyeon"],
-            date: "2026-09-19",
-            startTime: "14:00",
-            endTime: "17:00",
           },
           {
             id: "beach",
             name: "바다 산책팀",
             memberIds: ["minsu", "doyoon"],
-            date: "2026-09-19",
-            startTime: "14:00",
-            endTime: "17:00",
           },
         ],
         places: [
