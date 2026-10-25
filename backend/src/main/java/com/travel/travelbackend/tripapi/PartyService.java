@@ -110,6 +110,8 @@ public class PartyService {
         var party = party(n(trip,"id"), Inputs.id(partyId));
         if (s.db.queryForObject("SELECT COUNT(*) FROM itinerary_item WHERE party_id=?", Long.class, n(party,"id")) > 0)
             throw fail(409,"PARTY_IN_USE","일정에 연결된 파티는 삭제할 수 없어요.");
+        if (s.db.queryForObject("SELECT COUNT(*) FROM expense WHERE party_id=?",Long.class,n(party,"id"))>0)
+            throw fail(409,"PARTY_IN_USE","지출에 연결된 파티는 삭제할 수 없어요.");
         s.db.update("DELETE FROM trip_party_member WHERE party_id=?", n(party,"id"));
         s.db.update("DELETE FROM trip_party WHERE id=?", n(party,"id"));
     }

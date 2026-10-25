@@ -82,6 +82,8 @@ public class TripService {
         if(str(t,"status").equals("ARCHIVED")&&!(body.size()==2&&status.equals("ACTIVE")))active(t);
         String title=body.containsKey("title")?Inputs.string(body,"title",100,true):str(t,"name"),destination=body.containsKey("destination")?Inputs.string(body,"destination",100,true):str(t,"destination");
         LocalDate start=date(body.getOrDefault("startDate",str(t,"start_date"))),end=date(body.getOrDefault("endDate",str(t,"end_date")));dates(start,end);
+        if ((body.containsKey("startDate") || body.containsKey("endDate")) && s.db.queryForObject("SELECT COUNT(*) FROM itinerary_item WHERE trip_id=? AND (`date`<? OR `date`>?)",Long.class,n(t,"id"),start,end)>0)
+            throw fail(409,"ITINERARY_OUTSIDE_TRIP_DATES","등록된 일정을 포함하는 여행 기간으로 변경해 주세요.");
         long budget=body.containsKey("budget")?integer(body.get("budget"),1000000000L):n(t,"budget");
         s.db.update("UPDATE trip SET name=?,destination=?,start_date=?,end_date=?,budget=?,status=?,version=version+1,updated_at=? WHERE id=?",title,destination,start,end,budget,status,s.now(),n(t,"id"));
         if(status.equals("ARCHIVED"))cancelTripInvites(n(t,"id"));return detail(trip(n(t,"id")),me);
@@ -158,6 +160,15 @@ public class TripService {
         var locked=s.db.queryForList("SELECT * FROM trip WHERE owner_id=? OR id IN (SELECT trip_id FROM trip_member WHERE user_id=?) ORDER BY id FOR UPDATE",user,user);
         var owned=locked.stream().filter(t->ownerId(t)==user).toList();
         for(var t:owned){if(str(t,"status").equals("ACTIVE")&&countLocked(n(t,"id"))>1)throw fail(409,"ACTIVE_TRIP_OWNER","다른 멤버가 있는 여행을 먼저 보관해 주세요.");}
+        for (var t:locked) {
+            var membership=member(n(t,"id"),user);
+            if (membership==null) continue;
+            long memberId=n(membership,"id");
+            boolean referenced=s.db.queryForObject("SELECT COUNT(*) FROM expense WHERE payer_trip_member_id=?",Long.class,memberId)>0
+                || s.db.queryForObject("SELECT COUNT(*) FROM expense_participant WHERE trip_member_id=?",Long.class,memberId)>0
+                || s.db.queryForObject("SELECT COUNT(*) FROM settlement_confirmation WHERE from_trip_member_id=? OR to_trip_member_id=? OR updated_by_trip_member_id=?",Long.class,memberId,memberId,memberId)>0;
+            if (referenced) throw fail(409,"EXPENSE_MEMBER_REFERENCED","지출이나 정산 기록에 연결된 멤버는 탈퇴할 수 없어요.");
+        }
         for(var t:owned){s.db.update("UPDATE trip SET owner_id=NULL,status='ARCHIVED',version=version+1,updated_at=? WHERE id=?",s.now(),n(t,"id"));cancelTripInvites(n(t,"id"));}
         s.db.update("DELETE FROM trip_member WHERE user_id=?",user);
         s.db.update("DELETE FROM friendship WHERE user1_id=? OR user2_id=?",user,user);

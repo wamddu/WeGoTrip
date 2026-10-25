@@ -31,6 +31,9 @@ export interface Agenda {
   placeId: string | null;
   partyId: string | null;
   note: string;
+  // Older server schedules may only have a place-name/address snapshot.
+  placeName?: string;
+  address?: string;
 }
 export interface Expense {
   id: string;
@@ -42,11 +45,26 @@ export interface Expense {
   partyId: string | null;
   note: string;
 }
+export interface SettlementTransfer {
+  from: string;
+  to: string;
+  amount: number;
+  key: string;
+  completed?: boolean;
+  confirmationVersion?: string;
+}
+export interface ServerSettlement {
+  settlementRevision: string;
+  total: number;
+  balances: Record<string, { paid: number; share: number; balance: number }>;
+  transfers: SettlementTransfer[];
+}
 export interface CheckItem {
   id: string;
   title: string;
   ownerId: string | null;
   done: boolean;
+  stateToken?: string;
 }
 export interface Notice {
   id: string;
@@ -55,6 +73,9 @@ export interface Notice {
   authorId: string;
   pinned: boolean;
   createdAt: string;
+  authorName?: string;
+  updatedAt?: string;
+  version?: string;
 }
 export interface Message {
   id: string;
@@ -64,6 +85,11 @@ export interface Message {
 }
 export interface Trip {
   serverVersion?: number;
+  settlementRevision?: string;
+  serverSettlement?: ServerSettlement;
+  legacyExpensesPreserved?: boolean;
+  legacyChecklistPreserved?: boolean;
+  legacyNoticesPreserved?: boolean;
   id: string;
   title: string;
   destination: string;
@@ -124,6 +150,7 @@ export type SaveCommand = {
     tripId: string;
     collection: K;
     item: Entities[K];
+    settlementRevision?: string;
   };
 }[Collection];
 export type Command =
@@ -133,6 +160,16 @@ export type Command =
       tripId: string;
       collection: Collection;
       itemId: string;
+      settlementRevision?: string;
+      expectedStateToken?: string;
+      expectedVersion?: string;
+    }
+  | {
+      type: "checklist.complete";
+      tripId: string;
+      itemId: string;
+      done: boolean;
+      expectedStateToken?: string;
     }
   | { type: "trip.create"; input: TripInput }
   | {
@@ -145,7 +182,14 @@ export type Command =
   | { type: "trip.join"; code: string }
   | { type: "friend.add"; userId: string }
   | { type: "notification.read"; notificationId: string }
-  | { type: "transfer.confirm"; tripId: string; transferKey: string };
+  | {
+      type: "transfer.confirm";
+      tripId: string;
+      transferKey: string;
+      completed?: boolean;
+      settlementRevision?: string;
+      confirmationVersion?: string;
+    };
 export interface Session {
   user: User;
   token: string;
@@ -222,8 +266,7 @@ export function calculateSettlement(
   const creditors = ids
     .filter((id) => balances[id].balance > 0)
     .map((id) => ({ id, amount: balances[id].balance }));
-  const transfers: { from: string; to: string; amount: number; key: string }[] =
-    [];
+  const transfers: SettlementTransfer[] = [];
   for (const from of debtors)
     for (const to of creditors) {
       const amount = Math.min(from.amount, to.amount);

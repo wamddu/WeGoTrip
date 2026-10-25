@@ -117,7 +117,9 @@ export function HomeScreen() {
     }, [tripApi, refresh]),
   );
   const current = selectHomeTrip(data?.trips ?? []);
-  const todos = current?.checklist.filter((c) => !c.done).length ?? 0;
+  const assignedItems =
+    current?.checklist.filter((item) => item.ownerId !== null) ?? [];
+  const todos = assignedItems.filter((item) => !item.done).length;
   return (
     <Page
       refresh
@@ -219,9 +221,11 @@ export function HomeScreen() {
               </View>
               <View style={s.flex}>
                 <Text style={s.strong}>
-                  {todos
-                    ? `아직 ${todos}개의 준비물이 남았어요`
-                    : "준비물 확인을 모두 마쳤어요"}
+                  {!assignedItems.length
+                    ? "준비물을 추가해 보세요"
+                    : todos
+                      ? `아직 ${todos}개의 준비물이 남았어요`
+                      : "준비물 확인을 모두 마쳤어요"}
                 </Text>
                 <Text style={s.small}>하나씩 체크하고 가볍게 출발해요.</Text>
               </View>

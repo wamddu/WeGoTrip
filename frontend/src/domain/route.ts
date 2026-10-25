@@ -29,8 +29,14 @@ export function parseCoordinates(
   return value;
 }
 
+export interface EffectiveAgenda extends Agenda {
+  occurrenceId: string;
+  originalStartTime: string;
+  originalEndTime: string;
+}
 export interface RouteStop {
-  agenda: Agenda;
+  key: string;
+  agenda: EffectiveAgenda;
   place: Place | undefined;
   coordinates: Coordinates | null;
   number: number;
@@ -40,24 +46,116 @@ export interface RouteSegment {
   to: RouteStop;
   partyId: string | null;
 }
+export function compareAgenda(a: Agenda, b: Agenda) {
+  const byDateAndTime =
+    a.date.localeCompare(b.date) ||
+    (a.startTime || "24:00").localeCompare(b.startTime || "24:00");
+  if (byDateAndTime) return byDateAndTime;
+  // Database IDs stay strings, including values above JavaScript's safe integer range.
+  return /^[1-9][0-9]*$/.test(a.id) && /^[1-9][0-9]*$/.test(b.id)
+    ? a.id.length - b.id.length || a.id.localeCompare(b.id)
+    : a.id.localeCompare(b.id);
+}
+
+const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const validTimeRange = (agenda: Agenda) =>
+  validTime(agenda.startTime) &&
+  validTime(agenda.endTime) &&
+  agenda.startTime <= agenda.endTime;
+
+function occurrence(
+  agenda: Agenda,
+  startTime = agenda.startTime,
+  endTime = agenda.endTime,
+): EffectiveAgenda {
+  return {
+    ...agenda,
+    startTime,
+    endTime,
+    occurrenceId: JSON.stringify([agenda.id, agenda.date, startTime, endTime]),
+    originalStartTime: agenda.startTime,
+    originalEndTime: agenda.endTime,
+  };
+}
+
+/** Derive attendance intervals without changing any stored schedule. */
+export function getEffectiveAgenda(
+  trip: Trip,
+  date: string,
+  partyId: string | null,
+): EffectiveAgenda[] {
+  const day = trip.agenda.filter((agenda) => agenda.date === date);
+  if (!partyId)
+    return day.map((agenda) => occurrence(agenda)).sort(compareAgenda);
+
+  // Only this subgroup's known, positive-duration intervals override common attendance.
+  const intervals = day
+    .filter(
+      (agenda) =>
+        agenda.partyId === partyId &&
+        validTimeRange(agenda) &&
+        agenda.startTime < agenda.endTime,
+    )
+    .map((agenda) => ({ start: agenda.startTime, end: agenda.endTime }))
+    .sort(
+      (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end),
+    );
+  const occupied: { start: string; end: string }[] = [];
+  for (const interval of intervals) {
+    const previous = occupied[occupied.length - 1];
+    if (previous && interval.start <= previous.end) {
+      if (interval.end > previous.end) previous.end = interval.end;
+    } else occupied.push({ ...interval });
+  }
+
+  const effective: EffectiveAgenda[] = [];
+  for (const agenda of day) {
+    if (agenda.partyId) {
+      if (agenda.partyId === partyId) effective.push(occurrence(agenda));
+      continue;
+    }
+    if (!validTimeRange(agenda)) {
+      effective.push(occurrence(agenda));
+      continue;
+    }
+    if (agenda.startTime === agenda.endTime) {
+      // A point event belongs to [start, end), so the subgroup's end boundary is free.
+      if (
+        !occupied.some(
+          (interval) =>
+            interval.start <= agenda.startTime &&
+            agenda.startTime < interval.end,
+        )
+      )
+        effective.push(occurrence(agenda));
+      continue;
+    }
+
+    let availableFrom = agenda.startTime;
+    for (const interval of occupied) {
+      if (interval.end <= availableFrom) continue;
+      if (interval.start >= agenda.endTime) break;
+      if (interval.start > availableFrom)
+        effective.push(occurrence(agenda, availableFrom, interval.start));
+      if (interval.end > availableFrom) availableFrom = interval.end;
+      if (availableFrom >= agenda.endTime) break;
+    }
+    if (availableFrom < agenda.endTime)
+      effective.push(occurrence(agenda, availableFrom, agenda.endTime));
+  }
+  return effective.sort(compareAgenda);
+}
 
 export function buildDayRoute(
   trip: Trip,
   date: string,
   partyId: string | null,
 ) {
-  const agenda = trip.agenda
-    .filter(
-      (a) =>
-        a.date === date && (!partyId || !a.partyId || a.partyId === partyId),
-    )
-    .sort(
-      (a, b) =>
-        a.startTime.localeCompare(b.startTime) || a.id.localeCompare(b.id),
-    );
+  const agenda = getEffectiveAgenda(trip, date, partyId);
   const stops: RouteStop[] = agenda.map((a, index) => {
     const place = trip.places.find((p) => p.id === a.placeId);
     return {
+      key: a.occurrenceId,
       agenda: a,
       place,
       coordinates: validCoordinates(place?.coordinates)
@@ -84,10 +182,12 @@ export function buildDayRoute(
       if (
         !from.coordinates ||
         !to.coordinates ||
+        !validTimeRange(from.agenda) ||
+        !validTimeRange(to.agenda) ||
         from.agenda.endTime > to.agenda.startTime
       )
         continue;
-      const key = `${from.agenda.id}:${to.agenda.id}`;
+      const key = JSON.stringify([from.key, to.key]);
       if (seen.has(key)) continue;
       seen.add(key);
       segments.push({

@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { calculateSettlement, money } from "../../domain/models";
 import {
@@ -18,11 +18,25 @@ import { editHref, PartyFilter } from "./shared";
 import { useTrip } from "./trip-context";
 
 export function ExpenseSection() {
-  const { trip: t, data, session, execute, busy, partyId } = useTrip();
+  const {
+    trip: t,
+    data,
+    session,
+    execute,
+    busy,
+    partyId,
+    tripApi,
+    refresh,
+  } = useTrip();
+  useFocusEffect(
+    useCallback(() => {
+      if (tripApi) void refresh();
+    }, [tripApi, refresh]),
+  );
   const trip = t!;
   const [view, setView] = useState("지출 내역");
   const [error, setError] = useState("");
-  const totals = calculateSettlement(trip);
+  const totals = trip.serverSettlement ?? calculateSettlement(trip);
   const mine = totals.balances[session!.user.id];
   const expenses = trip.expenses
     .filter((e) => !partyId || e.partyId === partyId)
@@ -54,6 +68,12 @@ export function ExpenseSection() {
         ))}
       </View>
       <ErrorMessage message={error} />
+      {trip.legacyExpensesPreserved && (
+        <Text style={[s.small, { marginBottom: 16 }]}>
+          지출·정산은 이제 멤버들과 공유돼요. 이전에 이 기기에 저장한 기록은
+          그대로 보관되며 공유 기록에 자동으로 합쳐지지 않아요.
+        </Text>
+      )}
       {view === "지출 내역" ? (
         <>
           <PartyFilter />
@@ -105,8 +125,8 @@ export function ExpenseSection() {
         <>
           <Section title="여행 전체 정산" />
           <Text style={[s.small, { marginBottom: 17 }]}>
-            누가 누구에게 보내면 되는지 계산했어요. 완료 표시는 실제 송금 후
-            직접 기록해 주세요.
+            누가 누구에게 보내면 되는지 계산했어요. 송금을 받는 사람이 입금을
+            확인한 뒤 완료로 기록해 주세요.
           </Text>
           {totals.transfers.map((transfer) => (
             <View key={transfer.key} style={{ marginBottom: 12 }}>
@@ -133,7 +153,7 @@ export function ExpenseSection() {
                     ? "송금 완료 기록됨"
                     : "정산 대기"}
                 </Badge>
-                {[transfer.from, transfer.to].includes(session!.user.id) && (
+                {transfer.to === session!.user.id && (
                   <Button
                     title={
                       trip.confirmedTransfers.includes(transfer.key)
@@ -143,10 +163,16 @@ export function ExpenseSection() {
                     secondary
                     disabled={busy}
                     onPress={() => {
+                      setError("");
                       void execute({
                         type: "transfer.confirm",
                         tripId: trip.id,
                         transferKey: transfer.key,
+                        completed: !trip.confirmedTransfers.includes(
+                          transfer.key,
+                        ),
+                        settlementRevision: trip.settlementRevision,
+                        confirmationVersion: transfer.confirmationVersion,
                       }).catch((e) => setError(e.message));
                     }}
                   />

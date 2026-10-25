@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import {
   equalShares,
   money,
@@ -24,6 +24,11 @@ import { parseCoordinates, validCoordinates } from "../../domain/route";
 import { GeographicMap } from "../../ui/geographic-map";
 import { palette as p } from "../../ui/theme";
 import { PlaceSearch } from "./place-search";
+import { SelectField } from "../../ui/select-field";
+import { RepositoryConflictError } from "../../data/user-travel-repository";
+import { ApiError } from "../../data/user-api";
+import { ExpenseForm } from "./expense-form";
+import { NoticeEditor } from "./notice-editor";
 
 type Kind = Exclude<Collection, "messages"> | "settings";
 const titles: Record<Kind, string> = {
@@ -51,6 +56,7 @@ export default function EditScreen() {
     placeId?: string;
   }>();
   const { trip } = useTrip();
+  const openedItem = useRef<{ key: string; exists: boolean } | null>(null);
   if (!trip || !(params.kind in titles))
     return (
       <Page title="항목을 찾을 수 없어요" back>
@@ -61,10 +67,33 @@ export default function EditScreen() {
       </Page>
     );
   const kind = params.kind as Kind;
+  if (kind === "notices")
+    return (
+      <NoticeEditor
+        key={`${trip.id}-${params.itemId ?? "new"}`}
+        trip={trip}
+        itemId={params.itemId}
+      />
+    );
+  const editorKey = `${trip.id}-${kind}-${params.itemId ?? "new"}`;
+  const checklistUnassigned =
+    kind === "checklist" &&
+    trip.checklist.some(
+      (item) => item.id === params.itemId && item.ownerId === null,
+    );
+  if (openedItem.current?.key !== editorKey)
+    openedItem.current = {
+      key: editorKey,
+      exists:
+        kind === "settings" ||
+        trip[kind].some((item) => item.id === params.itemId),
+    };
   if (
     params.itemId &&
     kind !== "settings" &&
-    !trip[kind].some((i) => i.id === params.itemId)
+    (checklistUnassigned ||
+      (!trip[kind].some((i) => i.id === params.itemId) &&
+        !openedItem.current.exists))
   )
     return (
       <Page title="삭제된 항목" back>
@@ -76,7 +105,7 @@ export default function EditScreen() {
     );
   return (
     <Editor
-      key={`${trip.id}-${kind}-${params.itemId ?? "new"}`}
+      key={editorKey}
       trip={trip}
       kind={kind}
       itemId={params.itemId}
@@ -96,7 +125,8 @@ function Editor({
   itemId?: string;
   placeId?: string;
 }) {
-  const { date, partyId, data, session, execute, busy } = useTrip();
+  const { date, partyId, data, session, execute, busy, loading, tripApi } =
+    useTrip();
   const existing =
     kind === "settings" ? trip : trip[kind].find((item) => item.id === itemId);
   const initial = (existing ?? {}) as unknown as Record<string, unknown>;
@@ -133,6 +163,11 @@ function Editor({
   const [selectedPlace, setSelectedPlace] = useState<string | null>(
     string("placeId") || placeId || null,
   );
+  const [placeSelectionChanged, setPlaceSelectionChanged] = useState(false);
+  const selectPlace = (id: string | null) => {
+    setSelectedPlace(id);
+    setPlaceSelectionChanged(true);
+  };
   const [selectedParty, setSelectedParty] = useState<string | null>(
     existing ? string("partyId") || null : (defaultParty?.id ?? null),
   );
@@ -157,7 +192,19 @@ function Editor({
   const [pinned, setPinned] = useState(Boolean(initial.pinned));
   const [archived, setArchived] = useState(trip.archived);
   const [version] = useState(trip.serverVersion);
+  const [settlementRevision, setSettlementRevision] = useState(
+    trip.settlementRevision,
+  );
   const [error, setError] = useState("");
+  const [checklistStateToken, setChecklistStateToken] = useState<
+    string | undefined
+  >(typeof initial.stateToken === "string" ? initial.stateToken : undefined);
+  const [checklistConflict, setChecklistConflict] = useState(false);
+  const [checklistExpired, setChecklistExpired] = useState(false);
+  const [checklistRetry, setChecklistRetry] = useState<Command | null>(null);
+  const checklistMissing = kind === "checklist" && !!itemId && !existing;
+  const checklistDisabled =
+    busy || loading || trip.archived || checklistMissing || checklistExpired;
   const [confirm, setConfirm] = useState(false);
   const previewCoordinates = {
     latitude: Number(form.latitude),
@@ -187,7 +234,22 @@ function Editor({
       value={form[key]}
       onChangeText={(value) => patch(key, value)}
       placeholder={placeholder}
-      maxLength={key === "body" ? 3000 : key === "note" ? 1000 : 150}
+      {...(kind === "checklist"
+        ? { editable: !checklistDisabled && !checklistRetry }
+        : {})}
+      maxLength={
+        key === "body"
+          ? 3000
+          : key === "note"
+            ? kind === "agenda" || kind === "places"
+              ? 3000
+              : 1000
+            : key === "address" && kind === "places"
+              ? 255
+              : key === "title" && (kind === "agenda" || kind === "places")
+                ? 100
+                : 150
+      }
       {...extra}
     />
   );
@@ -222,13 +284,74 @@ function Editor({
       ? router.back()
       : router.replace(`/trip/${trip.id}/${toSection[kind]}`);
   }
+  function checklistError(error: unknown, command?: Command) {
+    if (kind !== "checklist") return;
+    if (error instanceof RepositoryConflictError) {
+      const latest = error.workspace.trips
+        .find((item) => item.id === trip.id)
+        ?.checklist.find((item) => item.id === itemId);
+      setChecklistStateToken(latest?.stateToken);
+      setChecklistConflict(true);
+      if (error.code === "PACKING_RETRY_EXPIRED") setChecklistExpired(true);
+      setChecklistRetry(null);
+    } else if (
+      tripApi &&
+      command &&
+      (!(error instanceof ApiError) || error.status >= 500)
+    ) {
+      setChecklistRetry(command);
+    } else setChecklistRetry(null);
+  }
+  async function retryChecklist() {
+    if (!checklistRetry || busy || loading) return;
+    setError("");
+    try {
+      await execute(checklistRetry);
+      setChecklistRetry(null);
+      leave();
+    } catch (error) {
+      checklistError(error, checklistRetry);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "저장 결과를 확인하지 못했어요.",
+      );
+    }
+  }
   async function save() {
+    if (busy || loading || checklistRetry || checklistExpired) return;
+    if (checklistMissing) {
+      setError(
+        "다른 멤버가 삭제한 준비물이에요. 입력한 내용은 유지되며 목록에서 다시 확인해 주세요.",
+      );
+      return;
+    }
     setError("");
     const id = itemId ?? uid();
     const authorId = session!.user.id;
     const createdAt = new Date().toISOString();
+    let command: Command | undefined;
     try {
-      let command: Command;
+      if (
+        kind === "checklist" &&
+        (!form.title.trim() ||
+          form.title.trim().length > 150 ||
+          (!!itemId && owner === null) ||
+          (owner !== null && !trip.memberIds.includes(owner)))
+      )
+        throw new Error(
+          "준비물 이름은 1~150자로 입력하고 현재 여행 멤버를 담당자로 선택해 주세요.",
+        );
+      if (
+        kind === "agenda" &&
+        string("placeName") &&
+        !string("placeId") &&
+        !selectedPlace &&
+        !placeSelectionChanged
+      )
+        throw new Error(
+          "기존 장소를 저장 장소에 다시 연결해 주세요. 장소를 지우려면 '장소 미정'을 선택해 주세요.",
+        );
       switch (kind) {
         case "agenda":
           command = {
@@ -268,6 +391,7 @@ function Editor({
             type: "item.save",
             tripId: trip.id,
             collection: "expenses",
+            settlementRevision,
             item: {
               id,
               title: form.title.trim(),
@@ -290,6 +414,7 @@ function Editor({
               title: form.title.trim(),
               ownerId: owner,
               done: Boolean(initial.done),
+              stateToken: checklistStateToken,
             },
           };
           break;
@@ -339,6 +464,12 @@ function Editor({
       await execute(command);
       leave();
     } catch (e) {
+      if (kind === "expenses" && e instanceof RepositoryConflictError)
+        setSettlementRevision(
+          e.workspace.trips.find((item) => item.id === trip.id)
+            ?.settlementRevision,
+        );
+      checklistError(e, command);
       setError(
         e instanceof Error
           ? e.message
@@ -347,17 +478,36 @@ function Editor({
     }
   }
   async function remove() {
-    if (!itemId || kind === "settings") return;
+    if (
+      !itemId ||
+      kind === "settings" ||
+      busy ||
+      loading ||
+      checklistMissing ||
+      checklistExpired ||
+      checklistRetry
+    )
+      return;
+    const command: Command = {
+      type: "item.delete",
+      tripId: trip.id,
+      collection: kind,
+      itemId,
+      settlementRevision: kind === "expenses" ? settlementRevision : undefined,
+      expectedStateToken:
+        kind === "checklist" ? checklistStateToken : undefined,
+    };
     try {
-      await execute({
-        type: "item.delete",
-        tripId: trip.id,
-        collection: kind,
-        itemId,
-      });
+      await execute(command);
       setConfirm(false);
       leave();
     } catch (e) {
+      if (kind === "expenses" && e instanceof RepositoryConflictError)
+        setSettlementRevision(
+          e.workspace.trips.find((item) => item.id === trip.id)
+            ?.settlementRevision,
+        );
+      checklistError(e, command);
       setConfirm(false);
       setError((e as Error).message);
     }
@@ -367,26 +517,70 @@ function Editor({
     const party = trip.parties.find((p) => p.id === id);
     if (party && kind === "expenses") setSelectedMembers([...party.memberIds]);
   }
+  function changeExpense(update: () => void) {
+    setError("");
+    update();
+  }
   return (
     <Page
       title={`${titles[kind]} ${kind === "settings" ? "" : itemId ? "수정" : "추가"}`}
       back
       navigation={false}
+      footer={
+        kind === "expenses" ? (
+          <View style={expenseStyles.footer}>
+            <View style={s.between}>
+              <Text style={s.small}>기록할 지출</Text>
+              <Text style={expenseStyles.total}>
+                {Number.isSafeInteger(numericAmount) && numericAmount > 0
+                  ? money(numericAmount)
+                  : "금액을 입력해 주세요"}
+              </Text>
+            </View>
+            <ErrorMessage message={error} />
+            <Button
+              title={itemId ? "수정 내용 저장하기" : "지출 저장하기"}
+              icon="check"
+              loading={busy}
+              disabled={trip.archived}
+              onPress={() => void save()}
+            />
+          </View>
+        ) : undefined
+      }
     >
       {trip.archived && kind !== "settings" && (
         <ErrorMessage message="종료한 여행이에요. 여행 설정에서 다시 열어 주세요." />
       )}
+      {checklistMissing && (
+        <ErrorMessage message="다른 멤버가 삭제한 준비물이에요. 입력한 내용은 유지되며 목록에서 다시 확인해 주세요." />
+      )}
+      {kind === "checklist" &&
+        checklistConflict &&
+        !checklistExpired &&
+        existing && (
+          <Text style={[s.small, { marginBottom: 16 }]}>
+            입력한 내용은 그대로 유지했어요. 현재 공유된 준비물은 ‘
+            {string("title")}’ ·{" "}
+            {people.find((person) => person.id === initial.ownerId)?.name ??
+              "여행 멤버"}
+            · {initial.done ? "준비 완료" : "미완료"} 상태예요. 확인 후 다시
+            저장해 주세요.
+          </Text>
+        )}
       {kind !== "places" &&
+        kind !== "expenses" &&
         field(
           "title",
           kind === "parties"
             ? "파티 이름"
-            : kind === "settings"
-              ? "여행 이름"
-              : `${titles[kind]} 제목`,
+            : kind === "checklist"
+              ? "준비물 이름"
+              : kind === "settings"
+                ? "여행 이름"
+                : `${titles[kind]} 제목`,
         )}
-      {(kind === "agenda" || kind === "expenses") &&
-        field("date", "날짜 (YYYY-MM-DD)")}
+      {kind === "agenda" && field("date", "날짜 (YYYY-MM-DD)")}
       {kind === "agenda" && (
         <>
           <View style={s.row}>
@@ -397,44 +591,60 @@ function Editor({
           </View>
         </>
       )}
-      {(kind === "agenda" || kind === "expenses") && (
-        <>
-          <Section title="파티 선택" />
-          <View style={[s.wrap, { marginBottom: 20 }]}>
-            <Chip
-              title={kind === "agenda" ? "모두 함께" : "공동 지출"}
-              active={!selectedParty}
-              onPress={() => selectParty(null)}
-            />
-            {trip.parties.map((p) => (
-              <Chip
-                key={p.id}
-                title={p.name}
-                active={selectedParty === p.id}
-                onPress={() => selectParty(p.id)}
-              />
-            ))}
-          </View>
-        </>
+      {kind === "agenda" && (
+        <SelectField
+          title="파티 선택"
+          value={selectedParty}
+          options={[
+            {
+              value: null,
+              label: "모두 함께",
+              description: `여행 멤버 전체 · ${trip.memberIds.length}명`,
+            },
+            ...trip.parties.map((party) => ({
+              value: party.id,
+              label: party.name,
+              description: `${party.memberIds.length}명 참여`,
+            })),
+          ]}
+          onChange={selectParty}
+          icon="users"
+          searchPlaceholder="파티 이름 검색"
+          emptyText="일치하는 파티가 없어요."
+          disabled={busy || trip.archived}
+        />
       )}
       {kind === "agenda" && (
         <>
-          <Section title="저장 장소 연결" />
-          <View style={[s.wrap, { marginBottom: 20 }]}>
-            <Chip
-              title="장소 미정"
-              active={!selectedPlace}
-              onPress={() => setSelectedPlace(null)}
-            />
-            {trip.places.map((p) => (
-              <Chip
-                key={p.id}
-                title={p.name}
-                active={selectedPlace === p.id}
-                onPress={() => setSelectedPlace(p.id)}
-              />
-            ))}
-          </View>
+          <SelectField
+            title="저장 장소 연결"
+            value={selectedPlace}
+            options={[
+              {
+                value: null,
+                label: "장소 미정",
+                description: "나중에도 연결할 수 있어요",
+              },
+              ...trip.places.map((place) => ({
+                value: place.id,
+                label: place.name,
+                description: place.address,
+              })),
+            ]}
+            onChange={selectPlace}
+            icon="pin"
+            searchPlaceholder="장소 이름이나 주소 검색"
+            emptyText="일치하는 저장 장소가 없어요."
+            hint={
+              string("placeName") &&
+              !string("placeId") &&
+              !selectedPlace &&
+              !placeSelectionChanged
+                ? `기존 장소: ${string("placeName")} · 저장 장소에 연결하거나 '장소 미정'을 선택해 주세요.`
+                : undefined
+            }
+            disabled={busy || trip.archived}
+          />
           {field("note", "메모", "함께 알아두면 좋은 내용", {
             multiline: true,
           })}
@@ -507,77 +717,36 @@ function Editor({
         </>
       )}
       {kind === "expenses" && (
-        <>
-          {field("amount", "금액 (원)", "예: 48000", {
-            keyboardType: "number-pad",
-          })}
-          <Section title="누가 결제했나요?" />
-          <View style={s.wrap}>
-            {people.map((u) => (
-              <Chip
-                key={u.id}
-                title={u.name}
-                active={payer === u.id}
-                onPress={() => setPayer(u.id)}
-              />
-            ))}
-          </View>
-          <Section title="누구와 나눌까요?" />
-          <View style={s.wrap}>
-            {people.map((u) => (
-              <Chip
-                key={u.id}
-                title={u.name}
-                active={selectedMembers.includes(u.id)}
-                onPress={() => toggleMember(u.id)}
-              />
-            ))}
-          </View>
-          <Section title="분담 방법" />
-          <View style={[s.wrap, { marginBottom: 20 }]}>
-            {["균등 분할", "직접 지정"].map((v) => (
-              <Chip
-                key={v}
-                title={v}
-                active={split === v}
-                onPress={() => setSplit(v)}
-              />
-            ))}
-          </View>
-          {people
-            .filter((u) => selectedMembers.includes(u.id))
-            .map((u) =>
-              split === "직접 지정" ? (
-                <Field
-                  key={u.id}
-                  title={`${u.name} 부담액 (원)`}
-                  value={custom[u.id] ?? ""}
-                  onChangeText={(value) =>
-                    setCustom((c) => ({ ...c, [u.id]: value }))
-                  }
-                  keyboardType="number-pad"
-                  placeholder="0"
-                />
-              ) : (
-                <View key={u.id} style={[s.between, { marginBottom: 10 }]}>
-                  <Text style={s.body}>{u.name}</Text>
-                  <Text style={s.strong}>{money(shares[u.id] ?? 0)}</Text>
-                </View>
-              ),
-            )}
-          <Text style={[s.small, { marginBottom: 20 }]}>
-            합계{" "}
-            {money(
-              Object.values(shares).reduce(
-                (sum, n) => sum + (Number.isFinite(n) ? n : 0),
-                0,
-              ),
-            )}{" "}
-            · {selectedMembers.length}명 분담{"\n"}균등 분할의 1원 단위 잔액은
-            멤버 순서로 나눠요.
-          </Text>
-          {field("note", "메모", "", { multiline: true })}
-        </>
+        <ExpenseForm
+          form={{
+            title: form.title,
+            date: form.date,
+            amount: form.amount,
+            note: form.note,
+          }}
+          people={people}
+          parties={trip.parties}
+          payer={payer}
+          selectedParty={selectedParty}
+          selectedMembers={selectedMembers}
+          split={split}
+          custom={custom}
+          shares={shares}
+          numericAmount={numericAmount}
+          disabled={busy || trip.archived}
+          onPatch={(key, value) => changeExpense(() => patch(key, value))}
+          onSelectParty={(id) => changeExpense(() => selectParty(id))}
+          onPayerChange={(id) => changeExpense(() => setPayer(id))}
+          onMembersChange={(ids) =>
+            changeExpense(() => setSelectedMembers(ids))
+          }
+          onSplitChange={(value) => changeExpense(() => setSplit(value))}
+          onCustomChange={(id, value) =>
+            changeExpense(() =>
+              setCustom((current) => ({ ...current, [id]: value })),
+            )
+          }
+        />
       )}
       {kind === "parties" && (
         <>
@@ -595,24 +764,40 @@ function Editor({
         </>
       )}
       {kind === "checklist" && (
-        <>
-          <Section title="누가 준비하나요?" />
-          <View style={s.wrap}>
-            <Chip
-              title="공용 준비물"
-              active={!owner}
-              onPress={() => setOwner(null)}
-            />
-            {people.map((u) => (
-              <Chip
-                key={u.id}
-                title={u.name}
-                active={owner === u.id}
-                onPress={() => setOwner(u.id)}
-              />
-            ))}
-          </View>
-        </>
+        <SelectField
+          title="누가 준비하나요?"
+          value={owner}
+          options={[
+            ...(!itemId
+              ? [
+                  {
+                    value: null,
+                    label: "모든 멤버가 각자 준비",
+                    description: `${trip.memberIds.length}명에게 개인 준비물이 하나씩 추가돼요`,
+                  },
+                ]
+              : []),
+            ...people.map((person) => ({
+              value: person.id,
+              label: person.name,
+              description:
+                person.id === session!.user.id
+                  ? "내가 담당해요"
+                  : "이 멤버가 담당해요",
+            })),
+          ]}
+          onChange={setOwner}
+          icon="users"
+          placeholder="담당자를 선택해 주세요"
+          searchPlaceholder="담당자 이름 검색"
+          emptyText="일치하는 여행 멤버가 없어요."
+          hint={
+            !itemId && owner === null
+              ? `현재 여행 멤버 ${trip.memberIds.length}명에게 같은 이름의 준비물을 각각 추가해요. 각자 체크한 결과를 모두 함께 볼 수 있어요.`
+              : "모든 멤버가 목록을 볼 수 있고, 담당자만 체크할 수 있어요. 이 항목의 수정·삭제는 해당 담당자의 준비물에만 반영돼요."
+          }
+          disabled={checklistDisabled || !!checklistRetry}
+        />
       )}
       {kind === "notices" && (
         <>
@@ -656,34 +841,89 @@ function Editor({
           </View>
         </>
       )}
-      <ErrorMessage message={error} />
-      {trip.serverVersion !== undefined &&
-        kind !== "settings" &&
-        kind !== "parties" && (
+      {kind !== "expenses" && <ErrorMessage message={error} />}
+      {kind === "checklist" && checklistExpired && (
+        <View style={{ gap: 10, marginTop: 12 }}>
           <Text style={s.small}>
-            이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
+            이전 요청의 확인 기간이 지났어요. 입력한 내용은 유지했으니 최신
+            목록에서 이미 등록되었는지 확인한 뒤 다시 추가하거나 수정해 주세요.
           </Text>
-        )}
-      <View style={{ gap: 12, marginTop: 28 }}>
-        <Button
-          title="저장하기"
-          loading={busy}
-          disabled={trip.archived && kind !== "settings"}
-          onPress={() => void save()}
-        />
-        {itemId && kind !== "settings" && (
           <Button
-            title={`${titles[kind]} 삭제`}
-            danger
-            disabled={busy || trip.archived}
-            onPress={() => setConfirm(true)}
+            title="최신 준비물 목록 확인하기"
+            secondary
+            disabled={busy || loading}
+            onPress={() => router.replace(`/trip/${trip.id}/checklist`)}
           />
-        )}
-      </View>
+        </View>
+      )}
+      {kind === "checklist" && checklistRetry && (
+        <View style={{ gap: 10, marginTop: 12 }}>
+          <Text style={s.small}>
+            저장 결과를 확인하지 못했어요. 입력한 내용을 유지하고 같은 요청으로
+            다시 확인하면 중복 등록을 막을 수 있어요.
+          </Text>
+          <Button
+            title="이전 요청 다시 확인하기"
+            secondary
+            loading={busy}
+            disabled={loading}
+            onPress={() => void retryChecklist()}
+          />
+        </View>
+      )}
+      {trip.serverVersion !== undefined && kind === "checklist" && (
+        <Text style={s.small}>준비물은 여행 멤버들과 함께 공유돼요.</Text>
+      )}
+      {trip.serverVersion !== undefined && kind === "notices" && (
+        <Text style={s.small}>
+          이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
+        </Text>
+      )}
+      {(kind !== "expenses" || itemId) && (
+        <View style={{ gap: 12, marginTop: 28 }}>
+          {kind !== "expenses" && (
+            <Button
+              title={
+                kind === "checklist" && checklistConflict && !checklistExpired
+                  ? "확인 후 다시 저장하기"
+                  : "저장하기"
+              }
+              loading={busy}
+              disabled={
+                (trip.archived && kind !== "settings") ||
+                (kind === "checklist" &&
+                  (checklistDisabled || !!checklistRetry))
+              }
+              onPress={() => void save()}
+            />
+          )}
+          {itemId && kind !== "settings" && (
+            <Button
+              title={`${titles[kind]} 삭제`}
+              danger
+              disabled={
+                busy ||
+                trip.archived ||
+                (kind === "checklist" &&
+                  (checklistDisabled || !!checklistRetry))
+              }
+              onPress={() => setConfirm(true)}
+            />
+          )}
+        </View>
+      )}
       <Confirm
         visible={confirm}
-        title={`${titles[kind]}를 삭제할까요?`}
-        description="이 항목은 여행 목록에서 삭제됩니다. 연결된 정보가 있으면 삭제가 제한될 수 있어요."
+        title={
+          kind === "checklist"
+            ? "준비물을 삭제할까요?"
+            : `${titles[kind]}를 삭제할까요?`
+        }
+        description={
+          kind === "checklist"
+            ? "이 담당자의 준비물 항목 하나가 삭제돼요. 다른 멤버에게 배정된 준비물은 유지돼요."
+            : "이 항목은 여행 목록에서 삭제됩니다. 연결된 정보가 있으면 삭제가 제한될 수 있어요."
+        }
         busy={busy}
         onCancel={() => setConfirm(false)}
         onConfirm={() => void remove()}
@@ -691,3 +931,15 @@ function Editor({
     </Page>
   );
 }
+
+const expenseStyles = StyleSheet.create({
+  footer: {
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    gap: 10,
+    backgroundColor: p.white,
+    borderTopWidth: 1,
+    borderTopColor: p.border,
+  },
+  total: { color: p.ink, fontSize: 16, fontWeight: "700", flexShrink: 1 },
+});

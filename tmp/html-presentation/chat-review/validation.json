@@ -1,0 +1,119 @@
+{
+  "checks": [
+    {
+      "slide": 1,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 2,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 3,
+      "overflow": [],
+      "images": [
+        {
+          "source": "gantt",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 4,
+      "overflow": [],
+      "images": [
+        {
+          "source": "채팅 화면.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "overflow": [],
+      "images": [
+        {
+          "source": "사진 선택 화면.png",
+          "loaded": true
+        },
+        {
+          "source": "이미지만 필터링.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "overflow": [],
+      "images": [
+        {
+          "source": "투표 추가1.png",
+          "loaded": true
+        },
+        {
+          "source": "투표 추가2.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "overflow": [],
+      "images": [
+        {
+          "source": "투표 채팅내 화면.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "overflow": [],
+      "images": [
+        {
+          "source": "공지 화면.png",
+          "loaded": true
+        },
+        {
+          "source": "공지작성 화면.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 10,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 11,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 12,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 13,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 14,
+      "overflow": [],
+      "images": []
+    }
+  ],
+  "nav": "2 / 14",
+  "zoom": true,
+  "errors": []
+}

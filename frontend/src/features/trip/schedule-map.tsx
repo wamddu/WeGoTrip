@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { buildDayRoute } from "../../domain/route";
+import { participationLabel } from "../../domain/participation";
 import type { Trip } from "../../domain/models";
 import { GeographicMap, type MapMarker } from "../../ui/geographic-map";
 import { Badge, Button, Empty, styles as s } from "../../ui/components";
@@ -35,13 +36,13 @@ export function ScheduleMap({
     groups.set(key, [...(groups.get(key) ?? []), stop]);
   }
   const markers: MapMarker[] = [...groups.values()].map((stops) => ({
-    id: stops[0].agenda.id,
+    id: stops[0].key,
     label: stops.map((s) => s.number).join("·"),
     title: stops[0].place!.name,
     coordinates: stops[0].coordinates!,
     color: partyColor(stops[0].agenda.partyId),
   }));
-  const selectedStop = route.stops.find((s) => s.agenda.id === selected);
+  const selectedStop = route.stops.find((s) => s.key === selected);
   const selectedMarker = selectedStop?.coordinates
     ? markers.find(
         (m) =>
@@ -65,7 +66,7 @@ export function ScheduleMap({
             selectedId={selectedMarker}
             onSelect={setSelected}
             lines={route.segments.map((line) => ({
-              id: `${line.from.agenda.id}:${line.to.agenda.id}`,
+              id: JSON.stringify([line.from.key, line.to.key]),
               from: line.from.coordinates!,
               to: line.to.coordinates!,
               color: partyColor(line.partyId),
@@ -109,12 +110,12 @@ export function ScheduleMap({
       )}
       {route.stops.map((stop) => (
         <Pressable
-          key={stop.agenda.id}
+          key={stop.key}
           accessibilityRole="button"
           accessibilityLabel={`${stop.number}번 ${stop.agenda.title} ${stop.coordinates ? "지도에서 선택" : "위치 등록"}`}
           onPress={() =>
             stop.coordinates
-              ? setSelected(stop.agenda.id)
+              ? setSelected(stop.key)
               : router.push(
                   editHref(
                     trip.id,
@@ -123,16 +124,23 @@ export function ScheduleMap({
                   ),
                 )
           }
-          style={[st.stop, selected === stop.agenda.id && st.selected]}
+          style={[st.stop, selected === stop.key && st.selected]}
         >
           <Badge color={partyColor(stop.agenda.partyId)}>{stop.number}</Badge>
           <View style={s.flex}>
             <Text style={s.strong}>
-              {stop.place?.name ?? stop.agenda.title}
+              {stop.place?.name ?? (stop.agenda.placeName || stop.agenda.title)}
             </Text>
             <Text style={s.small}>
-              {stop.agenda.startTime} · {stop.agenda.title}
+              {stop.agenda.startTime || "시간 미정"} —{" "}
+              {stop.agenda.endTime || "시간 미정"} · {stop.agenda.title}
             </Text>
+            {!!participationLabel(stop.agenda) && (
+              <Text style={s.small}>
+                {participationLabel(stop.agenda)} · 전체 일정{" "}
+                {stop.agenda.originalStartTime} — {stop.agenda.originalEndTime}
+              </Text>
+            )}
           </View>
           {!stop.coordinates && (
             <Text style={st.register}>

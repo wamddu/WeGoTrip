@@ -1,0 +1,118 @@
+{
+  "check": [
+    {
+      "slide": 1,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 2,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 3,
+      "overflow": [],
+      "images": [
+        {
+          "source": "gantt",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 4,
+      "overflow": [],
+      "images": [
+        {
+          "source": "정산화면.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "overflow": [],
+      "images": [
+        {
+          "source": "지출추가1.png",
+          "loaded": true
+        },
+        {
+          "source": "지출추가2.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "overflow": [],
+      "images": [
+        {
+          "source": "정산결과화면.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "overflow": [],
+      "images": [
+        {
+          "source": "expenseDB.png",
+          "loaded": true
+        },
+        {
+          "source": "expense_participantDB.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "overflow": [],
+      "images": [
+        {
+          "source": "settlement_confirmationDB.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "overflow": [],
+      "images": [
+        {
+          "source": "준비물화면.png",
+          "loaded": true
+        },
+        {
+          "source": "준비물화면2.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 10,
+      "overflow": [],
+      "images": [
+        {
+          "source": "packing_itemDB.png",
+          "loaded": true
+        }
+      ]
+    },
+    {
+      "slide": 11,
+      "overflow": [],
+      "images": []
+    },
+    {
+      "slide": 12,
+      "overflow": [],
+      "images": []
+    }
+  ],
+  "navigation": "2 / 12",
+  "zoom": true
+}

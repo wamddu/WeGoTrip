@@ -1,0 +1,11 @@
+{"schema":"openai.presentation.layout/v5","unit":"px","slide":{"id":"sl/5y9k7q","index":8,"layout":{"id":"ly/ovyl0nuh","name":"Blank"},"backgroundColor":"rgba(255,255,255,1)","position":{"left":0,"top":0,"width":1440,"height":810}},
+"elements":[
+{"id":"sh/wv2lkfa9","kind":"textbox","name":"text-0","position":{"left":80,"top":45,"width":1040,"height":30},"text":"서버 구현","style":{"fontSize":20,"typeface":"Pretendard","color":"#087E82","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/vat4ra9o","kind":"textbox","name":"primary-heading","position":{"left":80,"top":93,"width":1280,"height":76},"text":"API와 데이터베이스 연결","style":{"fontSize":48,"typeface":"Pretendard","color":"#152A45","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/u903i5s3","kind":"shape","position":{"left":80,"top":754,"width":1280,"height":1.5},"geometry":"rect","fillColor":"#DCE4EC","lineWidth":0},
+{"id":"sh/50bmxkrq","kind":"textbox","name":"text-3","position":{"left":80,"top":770,"width":500,"height":26},"text":"WeGoTrip  /  10조","style":{"fontSize":18,"typeface":"Pretendard","color":"#647589","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/4z25ofa5","kind":"textbox","name":"text-4","position":{"left":1260,"top":770,"width":100,"height":26},"text":"09","style":{"fontSize":18,"typeface":"Pretendard","color":"#647589","alignment":"right"},"geometry":"rect","lineWidth":0},
+{"id":"sh/jyt4va9k","kind":"textbox","name":"text-5","position":{"left":80,"top":191,"width":1280,"height":40},"text":"공통 경로  /api/v1/trips/{tripId}","style":{"fontSize":26,"typeface":"Pretendard","color":"#647589","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"tb/fy1obip0","kind":"table","position":{"left":80,"top":270,"width":1280,"height":395},"text":"기능\t주요 API\t저장 위치\n지출\t/expenses\n조회 · 등록 · 수정 · 삭제\texpense\nexpense_participant\n정산\t/settlement\n/settlement/confirmations\ttrip.settlement_revision\nsettlement_confirmation\n준비물\t/packing-items\n/{id}/completion\tpacking_item\n담당자 · 완료 상태","rows":4,"cols":3},
+{"id":"sh/t4vm14rm","kind":"textbox","name":"text-6","position":{"left":80,"top":703,"width":1280,"height":37},"text":"지출·정산: 승인된 DB 변경 반영    |    준비물: 기존 DB 구조 활용","style":{"fontSize":25,"typeface":"Pretendard","color":"#087E82","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0}
+]}

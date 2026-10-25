@@ -28,6 +28,8 @@ const names = {
   checklist: ["checklist", "checklist"],
   notice: ["megaphone", "campaign"],
   chat: ["bubble.left.and.bubble.right", "forum"],
+  image: ["photo", "image"],
+  poll: ["chart.bar.xaxis", "poll"],
   users: ["person.2", "group"],
   settings: ["slider.horizontal.3", "tune"],
   search: ["magnifyingglass", "search"],

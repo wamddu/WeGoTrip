@@ -17,6 +17,8 @@ const amount = (value: number) =>
   Number.isSafeInteger(value) && value >= 0 && value <= 1000000000;
 const text = (value: string, max = 100) =>
   typeof value === "string" && value.trim().length > 0 && value.length <= max;
+const optionalText = (value: string, max: number) =>
+  typeof value === "string" && value.length <= max;
 function validateTrip(input: Omit<TripInput, "memberIds">) {
   ensure(
     text(input.title) && text(input.destination),
@@ -127,14 +129,34 @@ export function applyCommand(
       (t) => t.key === command.transferKey,
     );
     ensure(
-      transfer && (transfer.from === userId || transfer.to === userId),
-      "당사자만 송금 완료를 기록할 수 있어요.",
+      transfer && transfer.to === userId,
+      "송금을 받는 사람만 완료 상태를 변경할 수 있어요.",
     );
-    trip.confirmedTransfers = trip.confirmedTransfers.includes(
-      command.transferKey,
-    )
-      ? trip.confirmedTransfers.filter((key) => key !== command.transferKey)
-      : [...trip.confirmedTransfers, command.transferKey];
+    const completed =
+      command.completed ??
+      !trip.confirmedTransfers.includes(command.transferKey);
+    trip.confirmedTransfers = trip.confirmedTransfers.filter(
+      (key) => key !== command.transferKey,
+    );
+    if (completed) trip.confirmedTransfers.push(command.transferKey);
+  } else if (command.type === "checklist.complete" && trip) {
+    ensure(!trip.archived, "종료한 여행은 수정할 수 없어요.");
+    ensure(
+      typeof command.done === "boolean",
+      "준비 완료 여부를 확인해 주세요.",
+    );
+    const item = trip.checklist.find((entry) => entry.id === command.itemId);
+    ensure(item, "이미 삭제된 준비물이에요. 목록에서 다시 확인해 주세요.");
+    ensure(
+      item.ownerId !== null,
+      "담당자가 없는 준비물은 먼저 담당자를 지정해 주세요.",
+    );
+    ensure(
+      item.ownerId === userId,
+      "배정된 준비물은 담당자만 완료 상태를 변경할 수 있어요.",
+    );
+    item.done = command.done;
+    section = "checklist";
   } else if (command.type === "item.save" && trip) {
     ensure(
       !trip.archived,
@@ -161,6 +183,10 @@ export function applyCommand(
       );
       const party = trip.parties.find((p) => p.id === a.partyId);
       ensure(!a.partyId || party, "파티를 다시 선택해 주세요.");
+      ensure(
+        optionalText(a.note, 3000),
+        "일정 메모는 3,000자 이내로 입력해 주세요.",
+      );
       section = "schedule";
       notificationTitle = "여행 일정이 업데이트되었어요";
     } else if (collection === "parties") {
@@ -174,8 +200,13 @@ export function applyCommand(
       );
     } else if (collection === "places") {
       ensure(
-        text(command.item.name) && text(command.item.address, 300),
+        text(command.item.name) && text(command.item.address, 255),
         "장소 이름과 주소를 입력해 주세요.",
+      );
+      ensure(
+        optionalText(command.item.category, 50) &&
+          optionalText(command.item.note, 3000),
+        "장소 분류는 50자, 메모는 3,000자 이내로 입력해 주세요.",
       );
       ensure(
         command.item.coordinates == null ||
@@ -186,7 +217,7 @@ export function applyCommand(
     } else if (collection === "expenses") {
       const e = command.item;
       ensure(
-        text(e.title) &&
+        text(e.title, 150) &&
           amount(e.amount) &&
           e.amount > 0 &&
           isMember(e.payerId),
@@ -208,27 +239,45 @@ export function applyCommand(
         !e.partyId || trip.parties.some((p) => p.id === e.partyId),
         "파티를 다시 선택해 주세요.",
       );
+      ensure(
+        optionalText(e.note, 1000),
+        "지출 메모는 1,000자 이내로 입력해 주세요.",
+      );
       trip.confirmedTransfers = [];
       section = "expenses";
       notificationTitle = "공동 지출이 업데이트되었어요";
     } else if (collection === "checklist") {
+      const item = command.item;
+      const previous = trip.checklist.find((entry) => entry.id === item.id);
       ensure(
-        text(command.item.title) &&
-          (!command.item.ownerId || isMember(command.item.ownerId)),
+        typeof item.title === "string" &&
+          text(item.title.trim(), 150) &&
+          (item.ownerId === null ||
+            (typeof item.ownerId === "string" && isMember(item.ownerId))),
         "준비물 이름과 담당자를 확인해 주세요.",
       );
+      ensure(typeof item.done === "boolean", "준비 완료 여부를 확인해 주세요.");
+      ensure(
+        !previous || item.ownerId !== null,
+        "수정할 준비물의 담당자를 선택해 주세요.",
+      );
+      item.title = item.title.trim();
+      // Completion is changed only by its own command, never by an old editor draft.
+      item.done =
+        previous?.ownerId === null ? false : (previous?.done ?? false);
       section = "checklist";
     } else if (collection === "notices") {
       const n = command.item;
       const previous = trip.notices.find((p) => p.id === n.id);
       ensure(
-        !previous || previous.authorId === userId || trip.ownerId === userId,
-        "작성자 또는 여행장만 공지를 수정할 수 있어요.",
+        trip.ownerId === userId,
+        "여행장만 공지를 작성하거나 수정할 수 있어요.",
       );
       ensure(
         text(n.title) && text(n.body, 3000),
         "공지 제목과 내용을 입력해 주세요.",
       );
+      ensure(typeof n.pinned === "boolean", "고정 여부를 확인해 주세요.");
       n.authorId = previous?.authorId ?? userId;
       n.createdAt = previous?.createdAt ?? new Date().toISOString();
       section = "notices";
@@ -245,10 +294,23 @@ export function applyCommand(
       notificationTitle = "새 메시지가 도착했어요";
     }
     // The discriminated union above validates every collection before updating it.
-    const list = trip[collection] as { id: string }[];
-    const index = list.findIndex((entry) => entry.id === item.id);
-    if (index < 0) list.push(item);
-    else list[index] = item;
+    if (command.collection === "checklist" && command.item.ownerId === null) {
+      // Stable local child IDs keep a repeated create from duplicating a member's item.
+      const prefix = `${command.item.id}:`;
+      if (!trip.checklist.some((entry) => entry.id.startsWith(prefix)))
+        for (const ownerId of new Set(trip.memberIds))
+          trip.checklist.push({
+            ...command.item,
+            id: `${prefix}${ownerId}`,
+            ownerId,
+            done: false,
+          });
+    } else {
+      const list = trip[collection] as { id: string }[];
+      const index = list.findIndex((entry) => entry.id === item.id);
+      if (index < 0) list.push(item);
+      else list[index] = item;
+    }
   } else if (command.type === "item.delete" && trip) {
     ensure(!trip.archived, "종료한 여행은 수정할 수 없어요.");
     const { collection, itemId } = command;
@@ -265,11 +327,7 @@ export function applyCommand(
         "일정 또는 지출에 연결된 파티는 삭제할 수 없어요.",
       );
     if (collection === "notices")
-      ensure(
-        trip.notices.find((n) => n.id === itemId)?.authorId === userId ||
-          trip.ownerId === userId,
-        "작성자 또는 여행장만 삭제할 수 있어요.",
-      );
+      ensure(trip.ownerId === userId, "여행장만 공지를 삭제할 수 있어요.");
     if (collection === "expenses") trip.confirmedTransfers = [];
     const list = trip[collection] as { id: string }[];
     const index = list.findIndex((item) => item.id === itemId);

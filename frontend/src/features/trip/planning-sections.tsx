@@ -26,7 +26,12 @@ import { TravelCover } from "../../ui/travel-cover";
 import { tripHref } from "../home/home-screen";
 import { DateFilter, editHref, PartyFilter } from "./shared";
 import { useTrip } from "./trip-context";
-import { buildDayRoute } from "../../domain/route";
+import {
+  buildDayRoute,
+  compareAgenda,
+  getEffectiveAgenda,
+} from "../../domain/route";
+import { participationLabel } from "../../domain/participation";
 import { ScheduleMap } from "./schedule-map";
 import { SchedulePager } from "./schedule-pager";
 
@@ -34,13 +39,12 @@ export function OverviewSection() {
   const { trip: t, data } = useTrip();
   const trip = t!;
   const amounts = calculateSettlement(trip);
-  const checked = trip.checklist.filter((c) => c.done).length;
+  const assignedItems = trip.checklist.filter((item) => item.ownerId !== null);
+  const checked = assignedItems.filter((item) => item.done).length;
   const today = localDate();
   const upcoming = [...trip.agenda]
     .filter((a) => a.date >= today)
-    .sort((a, b) =>
-      `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`),
-    )
+    .sort(compareAgenda)
     .slice(0, 2);
   const notice = [...trip.notices].sort(
     (a, b) =>
@@ -129,7 +133,7 @@ export function OverviewSection() {
         <View style={s.between}>
           <Text style={s.strong}>준비물 체크리스트</Text>
           <Badge>
-            {checked} / {trip.checklist.length}
+            {checked} / {assignedItems.length}
           </Badge>
         </View>
         <View style={st.progress}>
@@ -137,13 +141,17 @@ export function OverviewSection() {
             style={[
               st.progressFill,
               {
-                width: `${trip.checklist.length ? (checked / trip.checklist.length) * 100 : 0}%`,
+                width: `${assignedItems.length ? (checked / assignedItems.length) * 100 : 0}%`,
               },
             ]}
           />
         </View>
         <Text style={s.small}>
-          {trip.checklist.length - checked}개의 준비물이 남아 있어요.
+          {!assignedItems.length
+            ? "준비물을 추가해 보세요."
+            : checked === assignedItems.length
+              ? "준비물 확인을 모두 마쳤어요."
+              : `${assignedItems.length - checked}개의 준비물이 남아 있어요.`}
         </Text>
       </Card>
       {upcoming.length > 0 && (
@@ -163,12 +171,13 @@ export function OverviewSection() {
             >
               <Card>
                 <Text style={s.small}>
-                  {shortDate(a.date)} · {a.startTime} — {a.endTime}
+                  {shortDate(a.date)} · {a.startTime || "시간 미정"} —{" "}
+                  {a.endTime || "시간 미정"}
                 </Text>
                 <Text style={s.strong}>{a.title}</Text>
                 <Text style={s.small}>
                   {trip.places.find((p) => p.id === a.placeId)?.name ??
-                    "장소 미정"}
+                    (a.placeName || "장소 미정")}
                 </Text>
               </Card>
             </Pressable>
@@ -238,15 +247,15 @@ function SchedulePage({
       ) : (
         agenda.map((a, i) => (
           <Pressable
-            key={a.id}
+            key={a.occurrenceId}
             accessibilityRole="button"
-            accessibilityLabel={`${a.title} 수정`}
+            accessibilityLabel={`${a.title} ${a.startTime || "시간 미정"} ${participationLabel(a)} 원본 일정 수정`}
             onPress={() => router.push(editHref(trip.id, "agenda", a.id))}
             style={st.agendaRow}
           >
             <View style={st.timeColumn}>
-              <Text style={st.time}>{a.startTime}</Text>
-              <Text style={s.small}>{a.endTime}</Text>
+              <Text style={st.time}>{a.startTime || "시간 미정"}</Text>
+              <Text style={s.small}>{a.endTime || "시간 미정"}</Text>
               <View
                 style={[
                   st.dot,
@@ -273,11 +282,17 @@ function SchedulePage({
                   "모두 함께"}
               </Badge>
               <Text style={s.strong}>{a.title}</Text>
+              {!!participationLabel(a) && (
+                <Text style={s.small}>
+                  {participationLabel(a)} · 전체 일정 {a.originalStartTime} —{" "}
+                  {a.originalEndTime}
+                </Text>
+              )}
               <View style={s.row}>
                 <Icon name="pin" size={14} color={p.secondary} />
                 <Text style={[s.small, s.flex]}>
                   {trip.places.find((p) => p.id === a.placeId)?.name ??
-                    "장소 미정"}
+                    (a.placeName || "장소 미정")}
                 </Text>
               </View>
               {!!a.note && <Text style={s.small}>{a.note}</Text>}
@@ -297,7 +312,9 @@ function SchedulePage({
         {view === "일정표"
           ? "일정을 눌러 수정할 수 있어요. "
           : "번호를 선택하면 일정 정보를 확인할 수 있어요. "}
-        팀별 화면에도 함께 합류하는 일정은 표시됩니다.
+        {partyId
+          ? "파티 일정과 겹치는 시간을 제외한 전체 일정의 참여 구간을 표시해요."
+          : "전체 일정의 원래 시간을 표시해요."}
       </Text>
     </>
   );
@@ -314,14 +331,9 @@ export function PlacesSection() {
       `${item.name} ${item.address}`.includes(search) &&
       (category === "전체" || item.category === category),
   );
-  const route = trip.agenda
-    .filter(
-      (a) =>
-        a.date === date &&
-        a.placeId &&
-        (!partyId || !a.partyId || a.partyId === partyId),
-    )
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const route = getEffectiveAgenda(trip, date, partyId).filter(
+    (a) => a.placeId || a.placeName,
+  );
   async function openMap(name: string, address: string) {
     try {
       await Linking.openURL(
@@ -425,20 +437,32 @@ export function PlacesSection() {
           </Text>
           {route.map((a, i) => {
             const place = trip.places.find((p) => p.id === a.placeId);
+            const name = place?.name ?? a.placeName;
+            const address = place?.address ?? a.address ?? "";
             return (
-              place && (
-                <View key={a.id} style={[s.row, { marginBottom: 12 }]}>
+              name && (
+                <View
+                  key={a.occurrenceId}
+                  style={[s.row, { marginBottom: 12 }]}
+                >
                   <Badge>{i + 1}</Badge>
                   <View style={s.flex}>
                     <Card>
                       <Text style={s.strong}>
-                        {a.startTime} · {place.name}
+                        {a.startTime || "시간 미정"} —{" "}
+                        {a.endTime || "시간 미정"} · {name}
                       </Text>
-                      <Text style={s.small}>{place.address}</Text>
+                      {!!participationLabel(a) && (
+                        <Text style={s.small}>
+                          {participationLabel(a)} · 전체 일정{" "}
+                          {a.originalStartTime} — {a.originalEndTime}
+                        </Text>
+                      )}
+                      <Text style={s.small}>{address}</Text>
                       <Button
                         title="지도에서 위치 보기"
                         secondary
-                        onPress={() => void openMap(place.name, place.address)}
+                        onPress={() => void openMap(name, address)}
                       />
                     </Card>
                   </View>

@@ -1,0 +1,25 @@
+import { chromium } from 'file:///C:/Users/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import {pathToFileURL} from 'node:url';
+import fs from 'node:fs/promises';
+const root='C:/Programings/2026_2_창의학기제';
+const out=root+'/output/presentations/WeGoTrip_HTML_PDF';
+const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:810},deviceScaleFactor:1});
+await page.goto(pathToFileURL(out+'/WeGoTrip_정산_준비물.html').href);
+await page.evaluate(()=>document.fonts.ready);
+await page.emulateMedia({media:'print'});
+await page.pdf({path:out+'/WeGoTrip_정산_준비물.pdf',preferCSSPageSize:true,printBackground:true});
+const check=await page.evaluate(()=>[...document.querySelectorAll('.slide')].map((s,i)=>{
+ const r=s.getBoundingClientRect();const bad=[...s.querySelectorAll('*')].filter(e=>{const b=e.getBoundingClientRect();return b.left<r.left-1||b.right>r.right+1||b.bottom>r.bottom+1||b.top<r.top-1}).map(e=>e.tagName+':'+e.textContent.slice(0,60));
+ return {slide:i+1,overflow:bad,images:[...s.querySelectorAll('img')].map(e=>({source:e.dataset.source,loaded:e.complete&&e.naturalWidth>0}))};
+}));
+for(let i=0;i<await page.locator('.slide').count();i++)await page.locator('.slide').nth(i).screenshot({path:root+'/tmp/html-presentation/slide-'+String(i+1).padStart(2,'0')+'.png'});
+await page.emulateMedia({media:'screen'});
+await page.keyboard.press('ArrowRight');
+const navigation=await page.locator('#count').textContent();
+await page.keyboard.press('Home');await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
+await page.locator('.active img').click();const zoom=await page.locator('dialog').evaluate(d=>d.open);
+await page.keyboard.press('Escape');
+await fs.writeFile(root+'/tmp/html-presentation/validation.json',JSON.stringify({check,navigation,zoom},null,2));
+console.log(JSON.stringify({check,navigation,zoom}));
+await browser.close();

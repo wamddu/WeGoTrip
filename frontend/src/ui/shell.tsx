@@ -95,7 +95,13 @@ export function Page({
     </Frame>
   );
 }
-export function BottomBar({ add }: { add?: () => void }) {
+export function BottomBar({
+  add,
+  addDisabled = false,
+}: {
+  add?: () => void;
+  addDisabled?: boolean;
+}) {
   const path = usePathname();
   const { data } = useTravel();
   const unread = data?.notifications.filter((n) => !n.read).length ?? 0;
@@ -117,6 +123,8 @@ export function BottomBar({ add }: { add?: () => void }) {
             key={title}
             accessibilityRole="button"
             accessibilityLabel={title === "만들기" ? "새로 만들기" : title}
+            disabled={icon === "plus" && addDisabled}
+            accessibilityState={{ disabled: icon === "plus" && addDisabled }}
             onPress={() =>
               href
                 ? router.navigate(href)
@@ -124,7 +132,10 @@ export function BottomBar({ add }: { add?: () => void }) {
                   ? add()
                   : router.push("/trip/new")
             }
-            style={st.navItem}
+            style={[
+              st.navItem,
+              icon === "plus" && addDisabled && { opacity: 0.4 },
+            ]}
           >
             <View style={[st.navIcon, icon === "plus" && st.add]}>
               <Icon

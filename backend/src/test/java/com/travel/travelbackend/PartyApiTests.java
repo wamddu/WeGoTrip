@@ -30,7 +30,7 @@ class PartyApiTests {
     String a,b,c,trip,path;
 
     @BeforeEach void setup() throws Exception {
-        for (String table: List.of("itinerary_item","trip_party_member","trip_party","api_idempotency","trip_member","trip")) db.update("DELETE FROM "+table);
+        for (String table: List.of("itinerary_item","saved_place","trip_party_member","trip_party","api_idempotency","trip_member","trip")) db.update("DELETE FROM "+table);
         users.deleteAll();
         a=user("a"); b=user("b"); c=user("c");
         trip=field(mvc.perform(auth(post("/api/v1/trips"),a).header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json")

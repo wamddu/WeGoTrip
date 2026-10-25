@@ -1,6 +1,7 @@
-import { ScrollView, Text, View } from "react-native";
-import { datesBetween, shortDate, type Collection } from "../../domain/models";
+import { Text, View } from "react-native";
+import { datesBetween, type Collection } from "../../domain/models";
 import { Chip, styles as s } from "../../ui/components";
+import { SelectField } from "../../ui/select-field";
 import { useTrip } from "./trip-context";
 export function editHref(
   id: string,
@@ -21,21 +22,30 @@ export function editHref(
 export function DateFilter() {
   const { trip, date, setDate } = useTrip();
   if (!trip) return null;
+  const days = datesBetween(trip.startDate, trip.endDate);
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
-    >
-      {datesBetween(trip.startDate, trip.endDate).map((day, i) => (
-        <Chip
-          key={day}
-          title={`DAY ${i + 1} · ${shortDate(day)}`}
-          active={date === day}
-          onPress={() => setDate(day)}
-        />
-      ))}
-    </ScrollView>
+    <SelectField
+      title="여행 날짜"
+      icon="calendar"
+      value={date}
+      options={days.map((day, i) => {
+        const [, month, dayOfMonth] = day.split("-");
+        const weekday = ["일", "월", "화", "수", "목", "금", "토"][
+          new Date(`${day}T12:00:00`).getDay()
+        ];
+        return {
+          value: day,
+          label: `${Number(month)}월 ${Number(dayOfMonth)}일 (${weekday})`,
+          description: `DAY ${i + 1} · ${day.replaceAll("-", ".")}`,
+        };
+      })}
+      onChange={(day) => {
+        if (day) setDate(day);
+      }}
+      searchPlaceholder="날짜 또는 DAY 검색"
+      emptyText="찾는 날짜가 없어요. 여행 기간 안에서 검색해 주세요."
+      hint={`${days.length}일간의 여정 · 날짜를 선택해 일정을 확인하세요`}
+    />
   );
 }
 export function PartyFilter() {

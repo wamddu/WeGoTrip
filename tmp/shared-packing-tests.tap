@@ -1,0 +1,720 @@
+TAP version 13
+# Subtest: Home selects the nearest upcoming unarchived departure without reordering trips
+ok 1 - Home selects the nearest upcoming unarchived departure without reordering trips
+  ---
+  duration_ms: 4.2871
+  ...
+# Subtest: Home prioritizes ongoing trips over today's and future departures
+ok 2 - Home prioritizes ongoing trips over today's and future departures
+  ---
+  duration_ms: 0.3122
+  ...
+# Subtest: Home includes departure and end dates and switches trips after the end date
+ok 3 - Home includes departure and end dates and switches trips after the end date
+  ---
+  duration_ms: 0.1621
+  ...
+# Subtest: Home has no featured trip when only finished or archived trips remain
+ok 4 - Home has no featured trip when only finished or archived trips remain
+  ---
+  duration_ms: 0.1236
+  ...
+# Subtest: Push login offers permission without requesting or registering until the user allows
+ok 5 - Push login offers permission without requesting or registering until the user allows
+  ---
+  duration_ms: 1.059
+  ...
+# Subtest: Logout does not wait for an unanswered permission prompt or register after it resolves
+ok 6 - Logout does not wait for an unanswered permission prompt or register after it resolves
+  ---
+  duration_ms: 0.5256
+  ...
+# Subtest: Push denial and a dismissed explanation are not repeatedly prompted on login
+ok 7 - Push denial and a dismissed explanation are not repeatedly prompted on login
+  ---
+  duration_ms: 0.3572
+  ...
+# Subtest: Granted push registration reuses its device ID and refreshes changed tokens without duplicates
+ok 8 - Granted push registration reuses its device ID and refreshes changed tokens without duplicates
+  ---
+  duration_ms: 0.4549
+  ...
+# Subtest: Push registration failure does not reject login and can be retried
+ok 9 - Push registration failure does not reject login and can be retried
+  ---
+  duration_ms: 0.8071
+  ...
+# Subtest: Revoking OS notification permission removes the server device and invalidates its token
+ok 10 - Revoking OS notification permission removes the server device and invalidates its token
+  ---
+  duration_ms: 0.5406
+  ...
+# Subtest: Logout drains an in-flight device registration and removes the resulting device
+ok 11 - Logout drains an in-flight device registration and removes the resulting device
+  ---
+  duration_ms: 0.3715
+  ...
+# Subtest: A stale device ID is recreated after 404 but a token owned by another account is not claimed
+ok 12 - A stale device ID is recreated after 404 but a token owned by another account is not claimed
+  ---
+  duration_ms: 0.3325
+  ...
+# Subtest: 장소 검색은 한글 검색어를 인코딩하고 잘못된 위치 결과를 제외
+ok 13 - 장소 검색은 한글 검색어를 인코딩하고 잘못된 위치 결과를 제외
+  ---
+  duration_ms: 29.7784
+  ...
+# Subtest: 검색한 장소를 저장하면 이름·주소·좌표·Google 장소 ID가 유지
+ok 14 - 검색한 장소를 저장하면 이름·주소·좌표·Google 장소 ID가 유지
+  ---
+  duration_ms: 6.675
+  ...
+# Subtest: 지도 좌표는 두 숫자와 범위를 검증하고 빈 값은 위치 삭제로 처리
+ok 15 - 지도 좌표는 두 숫자와 범위를 검증하고 빈 값은 위치 삭제로 처리
+  ---
+  duration_ms: 0.958
+  ...
+# Subtest: 날짜/파티별 지도는 공통 일정을 포함하고 다른 파티 사이를 연결하지 않음
+ok 16 - 날짜/파티별 지도는 공통 일정을 포함하고 다른 파티 사이를 연결하지 않음
+  ---
+  duration_ms: 19.798
+  ...
+# Subtest: 빠진 위치와 겹친 시간은 연결을 끊고 같은 장소의 재방문은 순서를 유지
+ok 17 - 빠진 위치와 겹친 시간은 연결을 끊고 같은 장소의 재방문은 순서를 유지
+  ---
+  duration_ms: 0.4005
+  ...
+# Subtest: 파티 일정에 가려진 공통 일정은 숨기고 남은 참여 시간에 합류 또는 이탈
+ok 18 - 파티 일정에 가려진 공통 일정은 숨기고 남은 참여 시간에 합류 또는 이탈
+  ---
+  duration_ms: 0.7667
+  ...
+# Subtest: 공통 일정 중간의 파티 일정 이후 원래 일정으로 복귀하며 구간 키와 편집 ID를 구분
+ok 19 - 공통 일정 중간의 파티 일정 이후 원래 일정으로 복귀하며 구간 키와 편집 ID를 구분
+  ---
+  duration_ms: 0.4438
+  ...
+# Subtest: 계산된 참여 구간은 중간 합류·이탈을 표시하고 변경 없는 일정에는 안내를 붙이지 않음
+ok 20 - 계산된 참여 구간은 중간 합류·이탈을 표시하고 변경 없는 일정에는 안내를 붙이지 않음
+  ---
+  duration_ms: 0.3409
+  ...
+# Subtest: 같은 파티의 겹치거나 인접한 일정은 합쳐서 제외하고 떨어진 구간 사이의 공통 참여는 유지
+ok 21 - 같은 파티의 겹치거나 인접한 일정은 합쳐서 제외하고 떨어진 구간 사이의 공통 참여는 유지
+  ---
+  duration_ms: 0.269
+  ...
+# Subtest: 다른 날짜와 다른 파티 일정은 선택한 파티의 공통 참여 시간을 바꾸지 않음
+ok 22 - 다른 날짜와 다른 파티 일정은 선택한 파티의 공통 참여 시간을 바꾸지 않음
+  ---
+  duration_ms: 0.2026
+  ...
+# Subtest: 파티 미선택과 전체 일정 탭은 실제 등록된 공통 일정 시간을 그대로 유지
+ok 23 - 파티 미선택과 전체 일정 탭은 실제 등록된 공통 일정 시간을 그대로 유지
+  ---
+  duration_ms: 0.5033
+  ...
+# Subtest: 시간이 미정이거나 잘못된 기존 일정은 보존하고 해당 파티 시간은 공통 일정을 가리지 않음
+ok 24 - 시간이 미정이거나 잘못된 기존 일정은 보존하고 해당 파티 시간은 공통 일정을 가리지 않음
+  ---
+  duration_ms: 0.2602
+  ...
+# Subtest: 0분 파티 일정은 공통 시간을 가리지 않고 공통 순간 일정은 시작 포함·종료 제외로 계산
+ok 25 - 0분 파티 일정은 공통 시간을 가리지 않고 공통 순간 일정은 시작 포함·종료 제외로 계산
+  ---
+  duration_ms: 0.1694
+  ...
+# Subtest: 공통 일정 이탈·복귀 지도는 계산한 시간과 고유 구간 키를 사용하며 원본 수정 ID는 유지
+ok 26 - 공통 일정 이탈·복귀 지도는 계산한 시간과 고유 구간 키를 사용하며 원본 수정 ID는 유지
+  ---
+  duration_ms: 0.4806
+  ...
+# Subtest: 완전히 가려진 공통 일정은 지도 핀에서도 제외하고 겹친 파티 일정끼리는 동선을 연결하지 않음
+ok 27 - 완전히 가려진 공통 일정은 지도 핀에서도 제외하고 겹친 파티 일정끼리는 동선을 연결하지 않음
+  ---
+  duration_ms: 0.1564
+  ...
+# Subtest: 일정은 날짜·시간 순으로 정렬하고 시간 미정은 마지막에 두며 같은 시간의 큰 DB ID 순서를 보존
+ok 28 - 일정은 날짜·시간 순으로 정렬하고 시간 미정은 마지막에 두며 같은 시간의 큰 DB ID 순서를 보존
+  ---
+  duration_ms: 0.1083
+  ...
+# Subtest: 시간이 비어 있는 기존 일정의 지도 핀은 유지하며 동선 구간을 임의로 연결하지 않음
+ok 29 - 시간이 비어 있는 기존 일정의 지도 핀은 유지하며 동선 구간을 임의로 연결하지 않음
+  ---
+  duration_ms: 0.1129
+  ...
+# Subtest: 기존 저장 데이터에는 수정하지 않은 샘플 장소의 좌표만 보완
+ok 30 - 기존 저장 데이터에는 수정하지 않은 샘플 장소의 좌표만 보완
+  ---
+  duration_ms: 1.3421
+  ...
+# Subtest: 지도 투영은 왕복 좌표를 보존하고 320px/390px에서 모든 위치를 화면 안에 맞춤
+ok 31 - 지도 투영은 왕복 좌표를 보존하고 320px/390px에서 모든 위치를 화면 안에 맞춤
+  ---
+  duration_ms: 0.5638
+  ...
+# Subtest: 날짜 변경선과 단일 장소에서도 유한한 줌과 유효한 지도 타일 사용
+ok 32 - 날짜 변경선과 단일 장소에서도 유한한 줌과 유효한 지도 타일 사용
+  ---
+  duration_ms: 0.1585
+  ...
+# Subtest: 날짜 검증: 윤년, 잘못된 달력 날짜, 역순, 90일 한도
+ok 33 - 날짜 검증: 윤년, 잘못된 달력 날짜, 역순, 90일 한도
+  ---
+  duration_ms: 0.2795
+  ...
+# Subtest: 균등 분할은 원 단위 잔액을 보존하며 중복 멤버와 소수를 거절
+ok 34 - 균등 분할은 원 단위 잔액을 보존하며 중복 멤버와 소수를 거절
+  ---
+  duration_ms: 0.1421
+  ...
+# Subtest: 송금 계획 실행 후 모든 순잔액이 0원이 됨
+ok 35 - 송금 계획 실행 후 모든 순잔액이 0원이 됨
+  ---
+  duration_ms: 0.4626
+  ...
+# Subtest: 명령은 원본 데이터와 입력 항목을 변경하지 않고 작성자 위조를 차단
+ok 36 - 명령은 원본 데이터와 입력 항목을 변경하지 않고 작성자 위조를 차단
+  ---
+  duration_ms: 0.2239
+  ...
+# Subtest: 비멤버 접근과 일반 멤버의 여행장 권한 사용 차단
+ok 37 - 비멤버 접근과 일반 멤버의 여행장 권한 사용 차단
+  ---
+  duration_ms: 2.6212
+  ...
+# Subtest: 초대 코드는 대소문자와 공백을 정규화하고 중복 참여를 차단
+ok 38 - 초대 코드는 대소문자와 공백을 정규화하고 중복 참여를 차단
+  ---
+  duration_ms: 1.0993
+  ...
+# Subtest: 새 여행에 생성자를 포함하고 멤버 중복을 제거
+ok 39 - 새 여행에 생성자를 포함하고 멤버 중복을 제거
+  ---
+  duration_ms: 0.3252
+  ...
+# Subtest: 소그룹 일정은 여행 기간 안에서 날짜와 시간을 자유롭게 선택
+ok 40 - 소그룹 일정은 여행 기간 안에서 날짜와 시간을 자유롭게 선택
+  ---
+  duration_ms: 1.5763
+  ...
+# Subtest: 지출 합계와 분담 멤버를 검증하며 파티 변경이 과거 분담에 영향 없음
+ok 41 - 지출 합계와 분담 멤버를 검증하며 파티 변경이 과거 분담에 영향 없음
+  ---
+  duration_ms: 0.8669
+  ...
+# Subtest: 송금을 받는 사람만 완료 기록과 취소 가능, 지출 변경 시 완료 기록 초기화
+ok 42 - 송금을 받는 사람만 완료 기록과 취소 가능, 지출 변경 시 완료 기록 초기화
+  ---
+  duration_ms: 1.0332
+  ...
+# Subtest: 연결된 장소/파티 삭제와 타인의 공지 수정 차단
+ok 43 - 연결된 장소/파티 삭제와 타인의 공지 수정 차단
+  ---
+  duration_ms: 0.4701
+  ...
+# Subtest: 변경 알림은 다른 멤버에게 전달되며 일정 삭제도 schedule 경로 사용
+ok 44 - 변경 알림은 다른 멤버에게 전달되며 일정 삭제도 schedule 경로 사용
+  ---
+  duration_ms: 0.1734
+  ...
+# Subtest: 배정된 준비물은 담당자만 체크·취소하고 담당자 없는 항목은 배정 필요
+ok 45 - 배정된 준비물은 담당자만 체크·취소하고 담당자 없는 항목은 배정 필요
+  ---
+  duration_ms: 4.1516
+  ...
+# Subtest: Mock all-member packing creates separate incomplete items and preserves each person's independent status
+ok 46 - Mock all-member packing creates separate incomplete items and preserves each person's independent status
+  ---
+  duration_ms: 1.3161
+  ...
+# Subtest: Mock unassigned completion is not attributed to a newly assigned member
+ok 47 - Mock unassigned completion is not attributed to a newly assigned member
+  ---
+  duration_ms: 0.1574
+  ...
+# Subtest: 로컬 저장소 재생성 후 세션과 체크리스트 복원
+ok 48 - 로컬 저장소 재생성 후 세션과 체크리스트 복원
+  ---
+  duration_ms: 0.6524
+  ...
+# Subtest: 동시 저장 명령을 직렬화하고 저장 실패 후 다음 명령을 처리
+ok 49 - 동시 저장 명령을 직렬화하고 저장 실패 후 다음 명령을 처리
+  ---
+  duration_ms: 0.8204
+  ...
+# Subtest: 새 프로필은 자기 여행만 보며 초대 코드로 기존 여행에 참여
+ok 50 - 새 프로필은 자기 여행만 보며 초대 코드로 기존 여행에 참여
+  ---
+  duration_ms: 0.6102
+  ...
+# Subtest: HTTP 어댑터의 인증 헤더, 명령 응답, 오류 처리와 로그아웃
+ok 51 - HTTP 어댑터의 인증 헤더, 명령 응답, 오류 처리와 로그아웃
+  ---
+  duration_ms: 1.3621
+  ...
+# Subtest: USER API unwraps envelopes, sends bearer and preserves PATCH null semantics
+ok 52 - USER API unwraps envelopes, sends bearer and preserves PATCH null semantics
+  ---
+  duration_ms: 21.8225
+  ...
+# Subtest: Server accounts ignore legacy local travel and never persist bearer credentials
+ok 53 - Server accounts ignore legacy local travel and never persist bearer credentials
+  ---
+  duration_ms: 61.8404
+  ...
+# Subtest: Trip API paginates and creation retains its idempotency key through access refresh
+ok 54 - Trip API paginates and creation retains its idempotency key through access refresh
+  ---
+  duration_ms: 1.3056
+  ...
+# Subtest: Server workspace reads memberships and accepted friends, not local history
+ok 55 - Server workspace reads memberships and accepted friends, not local history
+  ---
+  duration_ms: 4.0268
+  ...
+# Subtest: Restored planning screens keep device drafts across refresh without overwriting server membership
+ok 56 - Restored planning screens keep device drafts across refresh without overwriting server membership
+  ---
+  duration_ms: 3.033
+  ...
+# Subtest: Party create/update/delete use the server, survive another account, and preserve old local drafts
+ok 57 - Party create/update/delete use the server, survive another account, and preserve old local drafts
+  ---
+  duration_ms: 1.6908
+  ...
+# Subtest: Party retries reuse a creation key after a lost response or a failed reload
+ok 58 - Party retries reuse a creation key after a lost response or a failed reload
+  ---
+  duration_ms: 0.9994
+  ...
+# Subtest: Party API uses existing subgroup fields and the correct nested paths
+ok 59 - Party API uses existing subgroup fields and the correct nested paths
+  ---
+  duration_ms: 1.0515
+  ...
+# Subtest: Server places and itinerary CRUD share IDs, notes, coordinates and subgroup references across accounts
+ok 60 - Server places and itinerary CRUD share IDs, notes, coordinates and subgroup references across accounts
+  ---
+  duration_ms: 2.008
+  ...
+# Subtest: Server planning reads preserve legacy device originals after unrelated local writes without automatic uploads
+ok 61 - Server planning reads preserve legacy device originals after unrelated local writes without automatic uploads
+  ---
+  duration_ms: 0.5808
+  ...
+# Subtest: Loaded itinerary snapshot text survives without a saved-place link and never infers a misleading map location
+ok 62 - Loaded itinerary snapshot text survives without a saved-place link and never infers a misleading map location
+  ---
+  duration_ms: 0.2008
+  ...
+# Subtest: places creates retain one key through lost response and a changed editor draft ID
+ok 63 - places creates retain one key through lost response and a changed editor draft ID
+  ---
+  duration_ms: 3.0258
+  ...
+# Subtest: places creates retain one key through failed reload and a changed editor draft ID
+ok 64 - places creates retain one key through failed reload and a changed editor draft ID
+  ---
+  duration_ms: 0.5093
+  ...
+# Subtest: places creates retain one key through lost response then failed reload and a changed editor draft ID
+ok 65 - places creates retain one key through lost response then failed reload and a changed editor draft ID
+  ---
+  duration_ms: 0.6796
+  ...
+# Subtest: agenda creates retain one key through lost response and a changed editor draft ID
+ok 66 - agenda creates retain one key through lost response and a changed editor draft ID
+  ---
+  duration_ms: 0.3762
+  ...
+# Subtest: agenda creates retain one key through failed reload and a changed editor draft ID
+ok 67 - agenda creates retain one key through failed reload and a changed editor draft ID
+  ---
+  duration_ms: 0.5115
+  ...
+# Subtest: agenda creates retain one key through lost response then failed reload and a changed editor draft ID
+ok 68 - agenda creates retain one key through lost response then failed reload and a changed editor draft ID
+  ---
+  duration_ms: 0.4571
+  ...
+# Subtest: places replays a known lost response after reloading an archived trip without making a duplicate
+ok 69 - places replays a known lost response after reloading an archived trip without making a duplicate
+  ---
+  duration_ms: 0.8777
+  ...
+# Subtest: places replays a known failed reload after reloading an archived trip without making a duplicate
+ok 70 - places replays a known failed reload after reloading an archived trip without making a duplicate
+  ---
+  duration_ms: 0.5349
+  ...
+# Subtest: agenda replays a known lost response after reloading an archived trip without making a duplicate
+ok 71 - agenda replays a known lost response after reloading an archived trip without making a duplicate
+  ---
+  duration_ms: 0.5827
+  ...
+# Subtest: agenda replays a known failed reload after reloading an archived trip without making a duplicate
+ok 72 - agenda replays a known failed reload after reloading an archived trip without making a duplicate
+  ---
+  duration_ms: 0.4915
+  ...
+# Subtest: agenda replays a known lost response after reloading an removed place without making a duplicate
+ok 73 - agenda replays a known lost response after reloading an removed place without making a duplicate
+  ---
+  duration_ms: 0.389
+  ...
+# Subtest: agenda replays a known failed reload after reloading an removed place without making a duplicate
+ok 74 - agenda replays a known failed reload after reloading an removed place without making a duplicate
+  ---
+  duration_ms: 0.4045
+  ...
+# Subtest: agenda replays a known lost response after reloading an removed subgroup without making a duplicate
+ok 75 - agenda replays a known lost response after reloading an removed subgroup without making a duplicate
+  ---
+  duration_ms: 0.4083
+  ...
+# Subtest: agenda replays a known failed reload after reloading an removed subgroup without making a duplicate
+ok 76 - agenda replays a known failed reload after reloading an removed subgroup without making a duplicate
+  ---
+  duration_ms: 0.4497
+  ...
+# Subtest: places cannot reuse an uncertain creation after session reset bypassing archive validation
+ok 77 - places cannot reuse an uncertain creation after session reset bypassing archive validation
+  ---
+  duration_ms: 0.4342
+  ...
+# Subtest: agenda cannot reuse an uncertain creation after session reset bypassing archive validation
+ok 78 - agenda cannot reuse an uncertain creation after session reset bypassing archive validation
+  ---
+  duration_ms: 0.4168
+  ...
+# Subtest: Place and itinerary pending creation keys stay independent and change when their input changes
+ok 79 - Place and itinerary pending creation keys stay independent and change when their input changes
+  ---
+  duration_ms: 0.7106
+  ...
+# Subtest: New sessions discard pending place and itinerary creation keys
+ok 80 - New sessions discard pending place and itinerary creation keys
+  ---
+  duration_ms: 0.5593
+  ...
+# Subtest: A place creation resolving after an account switch cannot load or expose the previous session's workspace
+ok 81 - A place creation resolving after an account switch cannot load or expose the previous session's workspace
+  ---
+  duration_ms: 0.4265
+  ...
+# Subtest: A planning list response completing after an account switch is rejected before replacing the workspace
+ok 82 - A planning list response completing after an account switch is rejected before replacing the workspace
+  ---
+  duration_ms: 0.3623
+  ...
+# Subtest: Planning commands reject archived trips and invalid dates, clocks, references and DB field lengths before sending writes
+ok 83 - Planning commands reject archived trips and invalid dates, clocks, references and DB field lengths before sending writes
+  ---
+  duration_ms: 1.156
+  ...
+# Subtest: Planning APIs paginate both nested collections and preserve bigint IDs and encoded cursors
+ok 84 - Planning APIs paginate both nested collections and preserve bigint IDs and encoded cursors
+  ---
+  duration_ms: 1.1103
+  ...
+# Subtest: Planning APIs use nested item routes, PUT bodies, idempotency headers and DELETE
+ok 85 - Planning APIs use nested item routes, PUT bodies, idempotency headers and DELETE
+  ---
+  duration_ms: 1.5931
+  ...
+# Subtest: Planning creation keeps its key and input through access-token refresh
+ok 86 - Planning creation keeps its key and input through access-token refresh
+  ---
+  duration_ms: 1.4795
+  ...
+# Subtest: Original trip commands use APIs and preserve the editor's version
+ok 87 - Original trip commands use APIs and preserve the editor's version
+  ---
+  duration_ms: 0.4683
+  ...
+# Subtest: Original create screen retries a lost response with the same creation key
+ok 88 - Original create screen retries a lost response with the same creation key
+  ---
+  duration_ms: 0.3229
+  ...
+# Subtest: Consent list matches nested server contract and failed reauthentication preserves the session
+ok 89 - Consent list matches nested server contract and failed reauthentication preserves the session
+  ---
+  duration_ms: 0.5928
+  ...
+# Subtest: Concurrent expired requests rotate once and retry with the new access token
+ok 90 - Concurrent expired requests rotate once and retry with the new access token
+  ---
+  duration_ms: 18.0579
+  ...
+# Subtest: Restart restores session through refresh and logout removes durable credentials
+ok 91 - Restart restores session through refresh and logout removes durable credentials
+  ---
+  duration_ms: 0.7791
+  ...
+# Subtest: Ambiguous refresh failures are not retried and clear the consumed credential
+ok 92 - Ambiguous refresh failures are not retried and clear the consumed credential
+  ---
+  duration_ms: 0.452
+  ...
+# Subtest: Logout waits for in-flight rotation and cannot resurrect a session
+ok 93 - Logout waits for in-flight rotation and cannot resurrect a session
+  ---
+  duration_ms: 0.5691
+  ...
+# Subtest: Web refresh sends only cookies and uses the exclusive rotation gate
+ok 94 - Web refresh sends only cookies and uses the exclusive rotation gate
+  ---
+  duration_ms: 0.5118
+  ...
+# Subtest: Late retry responses cannot overwrite or expire a newly logged-in account
+ok 95 - Late retry responses cannot overwrite or expire a newly logged-in account
+  ---
+  duration_ms: 2.021
+  ...
+# Subtest: A different account in another tab never receives the original pending write
+ok 96 - A different account in another tab never receives the original pending write
+  ---
+  duration_ms: 0.8902
+  ...
+# Subtest: Shared expense CRUD keeps bigint IDs, subgroup, notes, outside-trip dates and fixed shares across accounts
+ok 97 - Shared expense CRUD keeps bigint IDs, subgroup, notes, outside-trip dates and fixed shares across accounts
+  ---
+  duration_ms: 2.042
+  ...
+# Subtest: Server expense reads preserve original device arrays and a separate backup without automatically uploading or merging
+ok 98 - Server expense reads preserve original device arrays and a separate backup without automatically uploading or merging
+  ---
+  duration_ms: 0.467
+  ...
+# Subtest: Only receivers complete and cancel shared transfers, including archived trips
+ok 99 - Only receivers complete and cancel shared transfers, including archived trips
+  ---
+  duration_ms: 2.1129
+  ...
+# Subtest: Expense create retries lost response with one UUID and unchanged expected versions
+ok 100 - Expense create retries lost response with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.7792
+  ...
+# Subtest: Expense create retries failed reload with one UUID and unchanged expected versions
+ok 101 - Expense create retries failed reload with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.4903
+  ...
+# Subtest: Expense update retries lost response with one UUID and unchanged expected versions
+ok 102 - Expense update retries lost response with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.393
+  ...
+# Subtest: Expense update retries failed reload with one UUID and unchanged expected versions
+ok 103 - Expense update retries failed reload with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.462
+  ...
+# Subtest: Expense delete retries lost response with one UUID and unchanged expected versions
+ok 104 - Expense delete retries lost response with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.4295
+  ...
+# Subtest: Expense delete retries failed reload with one UUID and unchanged expected versions
+ok 105 - Expense delete retries failed reload with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.3455
+  ...
+# Subtest: Expense confirm retries lost response with one UUID and unchanged expected versions
+ok 106 - Expense confirm retries lost response with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.3659
+  ...
+# Subtest: Expense confirm retries failed reload with one UUID and unchanged expected versions
+ok 107 - Expense confirm retries failed reload with one UUID and unchanged expected versions
+  ---
+  duration_ms: 0.3193
+  ...
+# Subtest: A replayed receiver completion response cannot revive a later cancellation
+ok 108 - A replayed receiver completion response cannot revive a later cancellation
+  ---
+  duration_ms: 0.3684
+  ...
+# Subtest: Expense conflicts publish a fresh workspace and never automatically replay a stale choice
+ok 109 - Expense conflicts publish a fresh workspace and never automatically replay a stale choice
+  ---
+  duration_ms: 0.4388
+  ...
+# Subtest: Expense loading requires one revision, retries boundedly, and retains the old snapshot on API failure
+ok 110 - Expense loading requires one revision, retries boundedly, and retains the old snapshot on API failure
+  ---
+  duration_ms: 0.3659
+  ...
+# Subtest: Expense validation matches DB field lengths and keeps zero shares and payers outside the split
+ok 111 - Expense validation matches DB field lengths and keeps zero shares and payers outside the split
+  ---
+  duration_ms: 0.8958
+  ...
+# Subtest: Pending expense creates are never retried after the server's 24-hour idempotency retention
+ok 112 - Pending expense creates are never retried after the server's 24-hour idempotency retention
+  ---
+  duration_ms: 1.2122
+  ...
+# Subtest: Expense APIs paginate all revision-bound pages, preserve encoded cursors and reject unsafe monetary values
+ok 113 - Expense APIs paginate all revision-bound pages, preserve encoded cursors and reject unsafe monetary values
+  ---
+  duration_ms: 0.5475
+  ...
+# Subtest: Expense writes carry idempotency keys, expected revisions and explicit confirmation versions in HTTP contracts
+ok 114 - Expense writes carry idempotency keys, expected revisions and explicit confirmation versions in HTTP contracts
+  ---
+  duration_ms: 0.3214
+  ...
+# Subtest: Mock transfer confirmation accepts an explicit goal without toggling it on retries
+ok 115 - Mock transfer confirmation accepts an explicit goal without toggling it on retries
+  ---
+  duration_ms: 0.2708
+  ...
+# Subtest: All-member checklist creation uses independent bigint items and per-person completion across accounts
+ok 116 - All-member checklist creation uses independent bigint items and per-person completion across accounts
+  ---
+  duration_ms: 3.1778
+  ...
+# Subtest: All-member packing lost response retries preserve exactly one item per member
+ok 117 - All-member packing lost response retries preserve exactly one item per member
+  ---
+  duration_ms: 0.6067
+  ...
+# Subtest: All-member packing failed reload retries preserve exactly one item per member
+ok 118 - All-member packing failed reload retries preserve exactly one item per member
+  ---
+  duration_ms: 0.4877
+  ...
+# Subtest: Unassigned packing requires assignment before checking and starts incomplete after assignment
+ok 119 - Unassigned packing requires assignment before checking and starts incomplete after assignment
+  ---
+  duration_ms: 0.6148
+  ...
+# Subtest: Packing create validates assigned batch items and rejects old common replay envelopes
+ok 120 - Packing create validates assigned batch items and rejects old common replay envelopes
+  ---
+  duration_ms: 0.6632
+  ...
+# Subtest: Assigned checklist completion is blocked before API calls for other members and trip owners
+ok 121 - Assigned checklist completion is blocked before API calls for other members and trip owners
+  ---
+  duration_ms: 1.573
+  ...
+# Subtest: Checklist completion retries recheck assignment after a lost response or a failed reload
+ok 122 - Checklist completion retries recheck assignment after a lost response or a failed reload
+  ---
+  duration_ms: 1.3855
+  ...
+# Subtest: A server completion permission rejection refreshes a stale assignment without changing its status
+ok 123 - A server completion permission rejection refreshes a stale assignment without changing its status
+  ---
+  duration_ms: 0.5537
+  ...
+# Subtest: Checklist reads preserve device originals and one untouched backup without uploading or merging them
+ok 124 - Checklist reads preserve device originals and one untouched backup without uploading or merging them
+  ---
+  duration_ms: 2.3517
+  ...
+# Subtest: Checklist create retries lost response with the same original token and one committed mutation
+ok 125 - Checklist create retries lost response with the same original token and one committed mutation
+  ---
+  duration_ms: 0.6865
+  ...
+# Subtest: Checklist create retries failed reload with the same original token and one committed mutation
+ok 126 - Checklist create retries failed reload with the same original token and one committed mutation
+  ---
+  duration_ms: 0.6334
+  ...
+# Subtest: Checklist update retries lost response with the same original token and one committed mutation
+ok 127 - Checklist update retries lost response with the same original token and one committed mutation
+  ---
+  duration_ms: 0.5049
+  ...
+# Subtest: Checklist update retries failed reload with the same original token and one committed mutation
+ok 128 - Checklist update retries failed reload with the same original token and one committed mutation
+  ---
+  duration_ms: 11.4047
+  ...
+# Subtest: Checklist complete retries lost response with the same original token and one committed mutation
+ok 129 - Checklist complete retries lost response with the same original token and one committed mutation
+  ---
+  duration_ms: 0.9275
+  ...
+# Subtest: Checklist complete retries failed reload with the same original token and one committed mutation
+ok 130 - Checklist complete retries failed reload with the same original token and one committed mutation
+  ---
+  duration_ms: 0.5436
+  ...
+# Subtest: Checklist delete retries lost response with the same original token and one committed mutation
+ok 131 - Checklist delete retries lost response with the same original token and one committed mutation
+  ---
+  duration_ms: 0.2961
+  ...
+# Subtest: Checklist delete retries failed reload with the same original token and one committed mutation
+ok 132 - Checklist delete retries failed reload with the same original token and one committed mutation
+  ---
+  duration_ms: 0.4934
+  ...
+# Subtest: A replayed checklist completion response never restores a later undone state
+ok 133 - A replayed checklist completion response never restores a later undone state
+  ---
+  duration_ms: 0.6677
+  ...
+# Subtest: Checklist conflicts and deleted rows publish the newest list while keeping stale writes rejected
+ok 134 - Checklist conflicts and deleted rows publish the newest list while keeping stale writes rejected
+  ---
+  duration_ms: 0.5733
+  ...
+# Subtest: Checklist rejects invalid fields, missing captured tokens and archived writes before sending mutations
+ok 135 - Checklist rejects invalid fields, missing captured tokens and archived writes before sending mutations
+  ---
+  duration_ms: 1.8158
+  ...
+# Subtest: Expired checklist creation refreshes before allowing a fresh form with the same input and never resends the expired command
+ok 136 - Expired checklist creation refreshes before allowing a fresh form with the same input and never resends the expired command
+  ---
+  duration_ms: 1.1952
+  ...
+# Subtest: Expired checklist completion exposes the latest state and never automatically repeats the old goal
+ok 137 - Expired checklist completion exposes the latest state and never automatically repeats the old goal
+  ---
+  duration_ms: 0.6097
+  ...
+# Subtest: New checklist sessions discard pending creation keys without reusing another account's request
+ok 138 - New checklist sessions discard pending creation keys without reusing another account's request
+  ---
+  duration_ms: 0.4467
+  ...
+# Subtest: Checklist loading keeps the last complete snapshot on failures rather than publishing partial pages
+ok 139 - Checklist loading keeps the last complete snapshot on failures rather than publishing partial pages
+  ---
+  duration_ms: 0.2239
+  ...
+# Subtest: Packing API restarts changing snapshots, safely sorts all pages and preserves encoded bigint cursors
+ok 140 - Packing API restarts changing snapshots, safely sorts all pages and preserves encoded bigint cursors
+  ---
+  duration_ms: 0.566
+  ...
+# Subtest: Packing pagination bounds changing snapshots to three attempts and rejects malformed or repeated pages
+ok 141 - Packing pagination bounds changing snapshots to three attempts and rejects malformed or repeated pages
+  ---
+  duration_ms: 0.853
+  ...
+# Subtest: Packing item read and all write contracts use exact bodies, tokens, explicit completion and idempotency keys
+ok 142 - Packing item read and all write contracts use exact bodies, tokens, explicit completion and idempotency keys
+  ---
+  duration_ms: 0.3841
+  ...
+1..142
+# tests 142
+# suites 0
+# pass 142
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1070.1272

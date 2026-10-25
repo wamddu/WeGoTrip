@@ -49,6 +49,12 @@ export class UserApi {
     if (!/^https?:\/\//.test(baseUrl))
       throw new Error("API 서버 주소를 설정해 주세요.");
   }
+  get chatSocketUrl() {
+    return `${this.baseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "")}/ws/chat`.replace(
+      /^http/,
+      "ws",
+    );
+  }
   private async send<T>(
     path: string,
     method: string,
@@ -57,7 +63,11 @@ export class UserApi {
     headers: Record<string, string> = {},
   ): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const multipart = body instanceof FormData;
+    const timeout = setTimeout(
+      () => controller.abort(),
+      multipart ? 45000 : 15000,
+    );
     try {
       const response = await fetch(
         `${this.baseUrl.replace(/\/$/, "")}/v1${path}`,
@@ -66,11 +76,16 @@ export class UserApi {
           signal: controller.signal,
           credentials: this.refreshStorage?.kind === "WEB" ? "include" : "omit",
           headers: {
-            "Content-Type": "application/json",
+            ...(multipart ? {} : { "Content-Type": "application/json" }),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...headers,
           },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          body:
+            body === undefined
+              ? undefined
+              : multipart
+                ? body
+                : JSON.stringify(body),
         },
       );
       const envelope = await response.json().catch(() => null);
@@ -85,7 +100,9 @@ export class UserApi {
       return envelope.data;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError")
-        throw new Error("서버 응답이 늦어지고 있어요. 다시 로그인해 주세요.");
+        throw new Error(
+          "서버 응답이 늦어지고 있어요. 같은 요청으로 다시 시도해 주세요.",
+        );
       throw error;
     } finally {
       clearTimeout(timeout);

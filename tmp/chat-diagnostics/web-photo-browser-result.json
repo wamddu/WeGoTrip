@@ -1,0 +1,87 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "test": "small original",
+      "bytes": 40488
+    },
+    {
+      "test": "large EXIF portrait",
+      "inputBytes": 8388609,
+      "outputBytes": 28457,
+      "width": 1707,
+      "height": 2560,
+      "top": [
+        254,
+        0,
+        0,
+        255
+      ],
+      "bottom": [
+        0,
+        0,
+        254,
+        255
+      ],
+      "corner": [
+        254,
+        0,
+        0,
+        255
+      ],
+      "center": [
+        63,
+        0,
+        163,
+        255
+      ]
+    },
+    {
+      "test": "large transparent PNG",
+      "inputBytes": 8388609,
+      "outputBytes": 11008,
+      "width": 2560,
+      "height": 1707,
+      "top": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "bottom": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "corner": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center": [
+        0,
+        197,
+        0,
+        128
+      ]
+    },
+    {
+      "test": "PNG encoder fallback",
+      "outputBytes": 91952
+    },
+    {
+      "test": "image decode fallback",
+      "outputBytes": 28457,
+      "urlsReleased": 1
+    },
+    {
+      "test": "large encoded photo without padding",
+      "inputBytes": 12765598,
+      "outputBytes": 2636267,
+      "width": 2560,
+      "height": 1920
+    }
+  ]
+}

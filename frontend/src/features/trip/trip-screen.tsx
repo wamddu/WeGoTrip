@@ -26,12 +26,9 @@ import {
   PlacesSection,
 } from "./planning-sections";
 import { ExpenseSection } from "./expense-section";
-import {
-  ChatComposer,
-  ChatSection,
-  ChecklistSection,
-  NoticesSection,
-} from "./collaboration-sections";
+import { ChecklistSection, NoticesSection } from "./collaboration-sections";
+import { ChatComposer, ChatRoomSelector, ChatSection } from "./chat-section";
+import { ChatRoomProvider } from "./chat-context";
 import { editHref, ReadOnlyNote } from "./shared";
 import { tripHref } from "../home/home-screen";
 import type { Collection } from "../../domain/models";
@@ -46,9 +43,10 @@ const sections = [
 ] as const;
 export default function TripScreen() {
   const { section } = useLocalSearchParams<{ section: string }>();
-  const { trip, error, refresh } = useTrip();
+  const { trip, error, refresh, busy, loading, session } = useTrip();
   const [refreshing, setRefreshing] = useState(false);
   const scroll = useRef<ScrollView>(null);
+  const stickToBottom = useRef(true);
   if (!trip)
     return (
       <Frame>
@@ -89,94 +87,126 @@ export default function TripScreen() {
     chat: "notices",
   }[active] as Exclude<Collection, "messages">;
   return (
-    <Frame>
-      <View style={st.header}>
-        <IconButton
-          name="back"
-          label="여행 목록으로"
-          onPress={() => router.replace("/trips")}
-        />
-        <View style={s.flex}>
-          <Text style={s.strong} numberOfLines={1}>
-            {trip.title}
-          </Text>
-          <Text style={s.small}>
-            {trip.destination} · {trip.memberIds.length}명
-          </Text>
+    <ChatRoomProvider enabled={active === "chat"}>
+      <Frame>
+        <View style={st.header}>
+          <IconButton
+            name="back"
+            label="여행 목록으로"
+            onPress={() => router.replace("/trips")}
+          />
+          <View style={s.flex}>
+            <Text style={s.strong} numberOfLines={1}>
+              {trip.title}
+            </Text>
+            <Text style={s.small}>
+              {trip.destination} · {trip.memberIds.length}명
+            </Text>
+          </View>
+          <IconButton
+            name="users"
+            label="멤버와 여행 설정"
+            soft
+            onPress={() => router.push(`/trip/${trip.id}/manage`)}
+          />
         </View>
-        <IconButton
-          name="users"
-          label="멤버와 여행 설정"
-          soft
-          onPress={() => router.push(`/trip/${trip.id}/manage`)}
-        />
-      </View>
-      <View style={st.tabWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={st.tabs}
-        >
-          {sections.map(([key, title]) => (
-            <Pressable
-              key={key}
-              accessibilityRole="tab"
-              accessibilityLabel={title}
-              accessibilityState={{ selected: active === key }}
-              aria-selected={active === key}
-              onPress={() => router.replace(tripHref(trip.id, key))}
-              style={[st.tab, active === key && st.activeTab]}
-            >
-              <Text
-                style={[
-                  st.tabText,
-                  active === key && { color: p.primary, fontWeight: "700" },
-                ]}
+        <View style={st.tabWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={st.tabs}
+          >
+            {sections.map(([key, title]) => (
+              <Pressable
+                key={key}
+                accessibilityRole="tab"
+                accessibilityLabel={title}
+                accessibilityState={{ selected: active === key }}
+                aria-selected={active === key}
+                onPress={() => router.replace(tripHref(trip.id, key))}
+                style={[st.tab, active === key && st.activeTab]}
               >
-                {title}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          ref={scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={st.content}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={async () => {
-                setRefreshing(true);
-                await refresh();
-                setRefreshing(false);
+                <Text
+                  style={[
+                    st.tabText,
+                    active === key && { color: p.primary, fontWeight: "700" },
+                  ]}
+                >
+                  {title}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1, minHeight: 0 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          {active === "chat" && (
+            <ChatRoomSelector
+              onViewChange={() => {
+                stickToBottom.current = true;
               }}
             />
-          }
-          onContentSizeChange={() => {
-            if (active === "chat")
-              scroll.current?.scrollToEnd({ animated: true });
-          }}
-        >
-          <ErrorMessage message={error} />
-          <ReadOnlyNote />
-          {trip.serverVersion !== undefined && (
-            <Text style={[s.small, { marginBottom: 12 }]}>
-              여행 정보·멤버는 함께 공유해요. 일정·장소·정산·준비물·공지·대화는
-              현재 이 기기에만 저장돼요.
-            </Text>
           )}
-          {content}
-        </ScrollView>
-        {active === "chat" && <ChatComposer />}
-      </KeyboardAvoidingView>
-      <BottomBar add={() => router.push(editHref(trip.id, kind))} />
-    </Frame>
+          <ScrollView
+            ref={scroll}
+            style={active === "chat" ? st.chatMessages : undefined}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={
+              active === "chat" ? st.chatContent : st.content
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  await refresh();
+                  setRefreshing(false);
+                }}
+              />
+            }
+            onContentSizeChange={() => {
+              if (active === "chat" && stickToBottom.current)
+                scroll.current?.scrollToEnd({ animated: true });
+            }}
+            scrollEventThrottle={100}
+            onScroll={({ nativeEvent }) => {
+              stickToBottom.current =
+                nativeEvent.contentSize.height -
+                  nativeEvent.layoutMeasurement.height -
+                  nativeEvent.contentOffset.y <
+                100;
+            }}
+          >
+            <ErrorMessage message={error} />
+            <ReadOnlyNote />
+            {active !== "chat" && trip.serverVersion !== undefined && (
+              <Text style={[s.small, { marginBottom: 12 }]}>
+                여행 정보·멤버·파티·일정·장소·지출·정산·준비물은 함께 공유해요.
+                대화·이미지·투표·공지도 함께 공유해요.
+              </Text>
+            )}
+            {content}
+          </ScrollView>
+          {active === "chat" && <ChatComposer />}
+        </KeyboardAvoidingView>
+        {active !== "chat" && (
+          <BottomBar
+            add={() => router.push(editHref(trip.id, kind))}
+            addDisabled={
+              (active === "checklist" && (trip.archived || busy || loading)) ||
+              (active === "notices" &&
+                (trip.ownerId !== session?.user.id ||
+                  trip.archived ||
+                  busy ||
+                  loading))
+            }
+          />
+        )}
+      </Frame>
+    </ChatRoomProvider>
   );
 }
 const st = StyleSheet.create({
@@ -204,5 +234,7 @@ const st = StyleSheet.create({
   },
   activeTab: { borderBottomColor: p.primary },
   tabText: { fontSize: 13, color: p.secondary },
+  chatMessages: { flex: 1, minHeight: 0 },
+  chatContent: { paddingHorizontal: 16, paddingVertical: 12 },
   content: { padding: 21, paddingBottom: 32 },
 });

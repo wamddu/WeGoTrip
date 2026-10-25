@@ -7,7 +7,9 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
+import { AppState } from "react-native";
 import { repository } from "../data/repository";
+import { RepositoryConflictError } from "../data/user-travel-repository";
 import type { Command, Session, Workspace } from "../domain/models";
 import { useDeviceRegistration } from "../notifications/use-device-registration";
 import { PushPermissionPrompt } from "../notifications/permission-prompt";
@@ -84,6 +86,16 @@ export function TravelProvider({ children }: PropsWithChildren) {
         );
     }
   }, []);
+  const sessionUserId = session?.user.id;
+  useEffect(() => {
+    if (!sessionUserId || !repository.tripApi) return;
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active" && previous !== "active") void refresh();
+      previous = next;
+    });
+    return () => subscription.remove();
+  }, [sessionUserId, refresh]);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -136,6 +148,9 @@ export function TravelProvider({ children }: PropsWithChildren) {
       const next = await repository.execute(command);
       setData(next);
       return next;
+    } catch (error) {
+      if (error instanceof RepositoryConflictError) setData(error.workspace);
+      throw error;
     } finally {
       lock.current = false;
       setBusy(false);

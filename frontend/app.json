@@ -36,6 +36,24 @@
       ],
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "채팅에 공유할 사진을 선택합니다.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "채팅에 공유할 사진을 목록에서 선택합니다.",
+          "savePhotosPermission": false,
+          "granularPermissions": ["photo"],
+          "isAccessMediaLocationEnabled": false,
+          "preventAutomaticLimitedAccessAlert": true
+        }
+      ],
+      [
         "expo-notifications",
         {
           "defaultChannel": "default",
