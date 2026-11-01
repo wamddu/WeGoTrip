@@ -89,6 +89,8 @@ npm run build:native
 
 네이티브 export는 JS/에셋 번들 검증입니다. APK/IPA 생성이나 실제 기기 검증을 대신하지 않습니다. 웹 dist를 호스팅할 때는 동적 경로를 index.html로 연결하세요.
 
+Android 팀원 테스트용 설치 APK는 EAS의 `preview` 프로필로 만듭니다. `frontend`에서 `npx eas-cli@27.2.0 build --platform android --profile preview`를 실행하세요. 서버 주소·Firebase 파일은 EAS의 `preview` 환경에서 관리합니다. [APK 빌드·설치 안내](docs/ANDROID-APK-TESTING.md)를 참고하세요.
+
 - [구조와 기능 범위](docs/ARCHITECTURE.md)
 - [제안 API 계약](docs/API-CONTRACT.md)
 - [검증 기록](docs/VALIDATION.md)

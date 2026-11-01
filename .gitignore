@@ -1,3 +1,6 @@
 other_documents/
 
 google-services.json
+
+# Generated Android installation packages
+/output/apk/

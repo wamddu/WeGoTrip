@@ -220,7 +220,6 @@ export function SelectField({
                 <Text accessibilityRole="header" style={st.heading}>
                   {title}
                 </Text>
-                <Text style={st.description}>원하는 항목을 선택해 주세요</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -314,9 +313,7 @@ export function SelectField({
                 <View style={st.empty}>
                   <Icon name="search" size={24} color={p.secondary} />
                   <Text accessibilityLiveRegion="polite" style={st.emptyText}>
-                    {query.trim()
-                      ? "검색 결과가 없어요. 검색어를 바꿔 보세요."
-                      : emptyText}
+                    {query.trim() ? "검색 결과가 없어요." : emptyText}
                   </Text>
                 </View>
               }

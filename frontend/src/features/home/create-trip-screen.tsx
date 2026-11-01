@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useTravel } from "../../state/travel-provider";
 import {
   Button,
@@ -70,7 +70,7 @@ export function CreateTripScreen() {
     }
   }
   return (
-    <Page title="새로운 여정" back navigation={false}>
+    <Page title="새로운 여정" back>
       <View style={[s.wrap, { marginBottom: 24 }]}>
         {["새 여행", "초대 코드로 참여"].map((value) => (
           <Chip
@@ -117,11 +117,6 @@ export function CreateTripScreen() {
             placeholder="미정이면 0원"
           />
           <Section title="함께할 친구" />
-          <Text style={[s.body, { marginBottom: 14 }]}>
-            {tripApi
-              ? "선택한 친구가 초대를 수락하면 함께 참여해요."
-              : "지금 선택하거나, 여행을 만든 뒤 초대할 수 있어요."}
-          </Text>
           <View style={s.wrap}>
             {friends.map((u) => (
               <Chip
@@ -148,9 +143,6 @@ export function CreateTripScreen() {
             onChangeText={setCode}
             autoCapitalize="characters"
           />
-          <Text style={s.body}>
-            여행장이 공유한 코드로 같은 여행에 참여해요.
-          </Text>
         </>
       )}
       <ErrorMessage message={error} />

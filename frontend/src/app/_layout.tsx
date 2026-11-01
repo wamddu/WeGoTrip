@@ -10,9 +10,7 @@ export default function RootLayout() {
       <TravelProvider>
         <StatusBar style="dark" />
         <PushNavigation />
-        <Stack
-          screenOptions={{ headerShown: false, animation: "slide_from_right" }}
-        />
+        <Stack screenOptions={{ headerShown: false, animation: "none" }} />
       </TravelProvider>
     </SafeAreaProvider>
   );

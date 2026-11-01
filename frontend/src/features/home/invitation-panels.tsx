@@ -100,7 +100,6 @@ export function FriendRequests({
       <View style={f.heading}>
         <View style={s.flex}>
           <Text style={s.sectionTitle}>친구 요청함</Text>
-          <Text style={s.small}>새로운 친구의 인사를 확인해 보세요.</Text>
         </View>
         <Button
           title="새로고침"
@@ -240,11 +239,7 @@ export function FriendRequests({
                   : "대기 중인 요청이 없어요"
                 : `${labels[status]} 요청이 없어요`
             }
-          >
-            {direction === "received"
-              ? "친구 요청이 도착하면 이곳에서 확인하고 함께할 여행을 시작할 수 있어요."
-              : "내 친구 탭에서 친구를 찾아 먼저 반가운 인사를 보내보세요."}
-          </FriendEmpty>
+          />
         </View>
       )}
     </>

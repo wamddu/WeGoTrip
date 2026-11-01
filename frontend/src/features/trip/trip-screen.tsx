@@ -9,9 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTrip } from "./trip-context";
-import { BottomBar, Frame } from "../../ui/shell";
+import { Frame } from "../../ui/shell";
 import {
   Button,
   Empty,
@@ -29,9 +30,9 @@ import { ExpenseSection } from "./expense-section";
 import { ChecklistSection, NoticesSection } from "./collaboration-sections";
 import { ChatComposer, ChatRoomSelector, ChatSection } from "./chat-section";
 import { ChatRoomProvider } from "./chat-context";
-import { editHref, ReadOnlyNote } from "./shared";
+import { ChatScrollView } from "./chat-scroll-view";
+import { ReadOnlyNote } from "./shared";
 import { tripHref } from "../home/home-screen";
-import type { Collection } from "../../domain/models";
 const sections = [
   ["overview", "개요"],
   ["schedule", "일정"],
@@ -43,18 +44,15 @@ const sections = [
 ] as const;
 export default function TripScreen() {
   const { section } = useLocalSearchParams<{ section: string }>();
-  const { trip, error, refresh, busy, loading, session } = useTrip();
+  const { trip, error, refresh } = useTrip();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
-  const scroll = useRef<ScrollView>(null);
-  const stickToBottom = useRef(true);
   if (!trip)
     return (
       <Frame>
         <Empty
           title="여행을 찾을 수 없어요"
-          description={
-            error || "초대를 확인하거나 내 여행에서 다시 선택해 주세요."
-          }
+          description={error || undefined}
           action="내 여행으로"
           onPress={() => router.replace("/trips")}
         />
@@ -77,15 +75,13 @@ export default function TripScreen() {
     notices: <NoticesSection />,
     chat: <ChatSection />,
   }[active];
-  const kind = {
-    overview: "agenda",
-    schedule: "agenda",
-    places: "places",
-    expenses: "expenses",
-    checklist: "checklist",
-    notices: "notices",
-    chat: "notices",
-  }[active] as Exclude<Collection, "messages">;
+  const ContentScroll = active === "chat" ? ChatScrollView : ScrollView;
+  const keyboardBehavior =
+    Platform.OS === "ios"
+      ? "padding"
+      : Platform.OS === "android" && active === "chat"
+        ? "height"
+        : undefined;
   return (
     <ChatRoomProvider enabled={active === "chat"}>
       <Frame>
@@ -139,18 +135,13 @@ export default function TripScreen() {
           </ScrollView>
         </View>
         <KeyboardAvoidingView
+          key={active}
           style={{ flex: 1, minHeight: 0 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={keyboardBehavior}
+          keyboardVerticalOffset={insets.top}
         >
-          {active === "chat" && (
-            <ChatRoomSelector
-              onViewChange={() => {
-                stickToBottom.current = true;
-              }}
-            />
-          )}
-          <ScrollView
-            ref={scroll}
+          {active === "chat" && <ChatRoomSelector />}
+          <ContentScroll
             style={active === "chat" ? st.chatMessages : undefined}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -167,44 +158,13 @@ export default function TripScreen() {
                 }}
               />
             }
-            onContentSizeChange={() => {
-              if (active === "chat" && stickToBottom.current)
-                scroll.current?.scrollToEnd({ animated: true });
-            }}
-            scrollEventThrottle={100}
-            onScroll={({ nativeEvent }) => {
-              stickToBottom.current =
-                nativeEvent.contentSize.height -
-                  nativeEvent.layoutMeasurement.height -
-                  nativeEvent.contentOffset.y <
-                100;
-            }}
           >
             <ErrorMessage message={error} />
             <ReadOnlyNote />
-            {active !== "chat" && trip.serverVersion !== undefined && (
-              <Text style={[s.small, { marginBottom: 12 }]}>
-                여행 정보·멤버·파티·일정·장소·지출·정산·준비물은 함께 공유해요.
-                대화·이미지·투표·공지도 함께 공유해요.
-              </Text>
-            )}
             {content}
-          </ScrollView>
+          </ContentScroll>
           {active === "chat" && <ChatComposer />}
         </KeyboardAvoidingView>
-        {active !== "chat" && (
-          <BottomBar
-            add={() => router.push(editHref(trip.id, kind))}
-            addDisabled={
-              (active === "checklist" && (trip.archived || busy || loading)) ||
-              (active === "notices" &&
-                (trip.ownerId !== session?.user.id ||
-                  trip.archived ||
-                  busy ||
-                  loading))
-            }
-          />
-        )}
       </Frame>
     </ChatRoomProvider>
   );

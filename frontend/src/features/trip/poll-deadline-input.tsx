@@ -102,9 +102,6 @@ export function PollDeadlineField({
               />
             </View>
           </View>
-          <Text style={s.small}>
-            기기 시간대 기준 · 지정한 시각에 자동으로 마감돼요.
-          </Text>
         </View>
       )}
     </View>

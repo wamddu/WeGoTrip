@@ -96,9 +96,7 @@ export function FriendsScreen() {
         <View style={f.heroIcon}>
           <Icon name="users" size={48} color={p.primary} />
         </View>
-        <Text style={f.eyebrow}>TRAVEL TOGETHER</Text>
         <Text style={f.heroTitle}>{"좋은 여행은,\n좋은 친구와 함께."}</Text>
-        <Text style={s.body}>함께 떠나고 싶은 친구를 만나보세요.</Text>
         <View style={{ alignSelf: "flex-start" }}>
           <Badge background={p.white}>나의 여행 친구 {friends.length}명</Badge>
         </View>
@@ -146,11 +144,6 @@ export function FriendsScreen() {
               </View>
               <View style={s.flex}>
                 <Text style={s.strong}>새로운 친구 추가</Text>
-                <Text style={s.small}>
-                  {tripApi
-                    ? "친구가 가입한 이메일로 찾아보세요."
-                    : "친구의 이름이나 이메일로 찾아보세요."}
-                </Text>
               </View>
             </View>
             <View style={f.search}>
@@ -233,7 +226,6 @@ export function FriendsScreen() {
             <Text style={s.sectionTitle}>
               내 친구 <Text style={{ color: p.primary }}>{friends.length}</Text>
             </Text>
-            <Text style={s.small}>함께할 다음 여행이 기대돼요</Text>
           </View>
           {friends.length > 0 && (
             <View
@@ -280,11 +272,11 @@ export function FriendsScreen() {
                       <Text style={s.strong} numberOfLines={1}>
                         {user.name}
                       </Text>
-                      <Text style={s.small} numberOfLines={1}>
-                        {shared
-                          ? `함께하는 여행 ${shared}개`
-                          : "새로운 여행을 함께 계획해 보세요"}
-                      </Text>
+                      {shared > 0 && (
+                        <Text style={s.small} numberOfLines={1}>
+                          함께하는 여행 {shared}개
+                        </Text>
+                      )}
                     </View>
                     {tripApi && (
                       <Pressable
@@ -307,11 +299,7 @@ export function FriendsScreen() {
           ) : (
             <FriendEmpty
               title={query ? "검색 결과가 없어요" : "첫 여행 친구를 만나보세요"}
-            >
-              {query
-                ? "다른 이름으로 검색해 보세요."
-                : "위에서 친구를 찾아 추가하면\n함께할 여행을 더 쉽게 준비할 수 있어요."}
-            </FriendEmpty>
+            />
           )}
         </>
       )}

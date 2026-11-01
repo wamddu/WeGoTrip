@@ -68,12 +68,6 @@ export function ExpenseSection() {
         ))}
       </View>
       <ErrorMessage message={error} />
-      {trip.legacyExpensesPreserved && (
-        <Text style={[s.small, { marginBottom: 16 }]}>
-          지출·정산은 이제 멤버들과 공유돼요. 이전에 이 기기에 저장한 기록은
-          그대로 보관되며 공유 기록에 자동으로 합쳐지지 않아요.
-        </Text>
-      )}
       {view === "지출 내역" ? (
         <>
           <PartyFilter />
@@ -115,7 +109,6 @@ export function ExpenseSection() {
           {!expenses.length && (
             <Empty
               title="기록된 지출이 없어요"
-              description="결제한 사람과 비용을 나눌 멤버를 선택해 기록하세요."
               action="지출 기록하기"
               onPress={() => router.push(editHref(trip.id, "expenses"))}
             />
@@ -124,10 +117,6 @@ export function ExpenseSection() {
       ) : (
         <>
           <Section title="여행 전체 정산" />
-          <Text style={[s.small, { marginBottom: 17 }]}>
-            누가 누구에게 보내면 되는지 계산했어요. 송금을 받는 사람이 입금을
-            확인한 뒤 완료로 기록해 주세요.
-          </Text>
           {totals.transfers.map((transfer) => (
             <View key={transfer.key} style={{ marginBottom: 12 }}>
               <Card>
@@ -180,12 +169,7 @@ export function ExpenseSection() {
               </Card>
             </View>
           ))}
-          {!totals.transfers.length && (
-            <Empty
-              title="정산할 금액이 없어요"
-              description="현재 결제액과 부담액이 모두 맞아요."
-            />
-          )}
+          {!totals.transfers.length && <Empty title="정산할 금액이 없어요" />}
           <Section title="멤버별 부담 내역" />
           {Object.entries(totals.balances).map(([id, balance]) => (
             <View key={id} style={st.memberRow}>
@@ -198,10 +182,6 @@ export function ExpenseSection() {
               </View>
             </View>
           ))}
-          <Text style={[s.small, { marginTop: 20 }]}>
-            지출이 추가·수정·삭제되면 정산 완료 기록은 초기화돼요. 원 단위
-            잔액도 빠짐없이 나눕니다.
-          </Text>
         </>
       )}
     </>

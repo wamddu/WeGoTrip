@@ -241,10 +241,6 @@ export function UserSettings() {
                   }
                 />
               </View>
-              <Text style={s.small}>
-                푸시 알림 설정은 계정 전체에 적용됩니다. 기기 권한과 별도로 켜고
-                끌 수 있어요. 위치 공유 설정은 실제 위치 전송을 시작하지 않아요.
-              </Text>
             </Card>
           )}
           <Section title="약관 동의 내역" />
@@ -307,9 +303,6 @@ export function UserSettings() {
           <Section title="회원 탈퇴" />
           <Card>
             <View style={{ gap: 12 }}>
-              <Text style={s.small}>
-                탈퇴를 진행하려면 현재 비밀번호로 본인을 확인해 주세요.
-              </Text>
               <Field
                 title="본인 확인 비밀번호"
                 value={reauth}

@@ -135,11 +135,7 @@ export function HomeScreen() {
       }
     >
       <View style={st.greeting}>
-        <Text style={st.eyebrow}>LET’S GO SOMEWHERE</Text>
         <Text style={s.title}>{session?.user.name}님, 어디로 떠날까요?</Text>
-        <Text style={[s.body, { marginTop: 7 }]}>
-          함께할수록 더 좋은 여행의 시작.
-        </Text>
       </View>
       <ErrorMessage message={error} />
       {!!error && (
@@ -167,7 +163,6 @@ export function HomeScreen() {
               ? "진행 중이거나 예정된 여행이 없어요"
               : "첫 여행을 만들어 보세요"
           }
-          description="친구들과 함께 일정을 채워 나가요."
           action="여행 만들기"
           onPress={() => router.push("/trip/new")}
         />
@@ -180,9 +175,6 @@ export function HomeScreen() {
       >
         <View style={s.flex}>
           <Text style={s.strong}>새로운 추억을 만들 시간</Text>
-          <Text style={[s.small, { marginTop: 5 }]}>
-            여행을 만들고, 함께할 친구를 초대해요.
-          </Text>
         </View>
         <View style={st.newPlus}>
           <Icon name="plus" color={p.mint} size={25} />
@@ -227,7 +219,6 @@ export function HomeScreen() {
                       ? `아직 ${todos}개의 준비물이 남았어요`
                       : "준비물 확인을 모두 마쳤어요"}
                 </Text>
-                <Text style={s.small}>하나씩 체크하고 가볍게 출발해요.</Text>
               </View>
             </View>
             <Button
@@ -258,7 +249,7 @@ export function TripsScreen() {
       filter === "함께할 여행" ? !t.archived : t.archived,
     ) ?? [];
   return (
-    <Page title="내 여행" subtitle="우리의 모든 여정이 모이는 곳" refresh>
+    <Page title="내 여행" refresh>
       <View style={s.wrap}>
         {["함께할 여행", "다녀온 여행"].map((v) => (
           <Chip
@@ -275,12 +266,7 @@ export function TripsScreen() {
           <TripCard key={t.id} trip={t} />
         ))}
       </View>
-      {!trips.length && (
-        <Empty
-          title="아직 여행이 없어요"
-          description="새 여행을 만들거나 초대 코드로 참여해 보세요."
-        />
-      )}
+      {!trips.length && <Empty title="아직 여행이 없어요" />}
       <View style={{ marginTop: 22 }}>
         <Button
           title="여행 만들기 또는 초대 참여"
@@ -293,13 +279,6 @@ export function TripsScreen() {
 }
 const st = StyleSheet.create({
   greeting: { paddingTop: 4 },
-  eyebrow: {
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.7,
-    color: p.mint,
-    marginBottom: 9,
-  },
   tripCard: { borderRadius: 21, overflow: "hidden" },
   tripImage: { padding: 19, justifyContent: "space-between" },
   tripBottom: { paddingTop: 30 },

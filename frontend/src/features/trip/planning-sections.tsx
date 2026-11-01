@@ -303,19 +303,10 @@ function SchedulePage({
       {view === "일정표" && !agenda.length && (
         <Empty
           title="아직 비어 있는 하루예요"
-          description="함께할 일정을 하나씩 채워 볼까요?"
           action="첫 일정 추가"
           onPress={() => router.push(editHref(trip.id, "agenda"))}
         />
       )}
-      <Text style={[s.small, { marginTop: 16 }]}>
-        {view === "일정표"
-          ? "일정을 눌러 수정할 수 있어요. "
-          : "번호를 선택하면 일정 정보를 확인할 수 있어요. "}
-        {partyId
-          ? "파티 일정과 겹치는 시간을 제외한 전체 일정의 참여 구간을 표시해요."
-          : "전체 일정의 원래 시간을 표시해요."}
-      </Text>
     </>
   );
 }
@@ -421,20 +412,12 @@ export function PlacesSection() {
               </Card>
             </View>
           ))}
-          {!list.length && (
-            <Empty
-              title="저장한 장소가 없어요"
-              description="검색 조건을 바꾸거나 가고 싶은 곳을 저장해 보세요."
-            />
-          )}
+          {!list.length && <Empty title="저장한 장소가 없어요" />}
         </>
       ) : (
         <>
           <DateFilter />
           <PartyFilter />
-          <Text style={[s.body, { marginBottom: 18 }]}>
-            일정에 등록한 순서대로 방문할 장소예요.
-          </Text>
           {route.map((a, i) => {
             const place = trip.places.find((p) => p.id === a.placeId);
             const name = place?.name ?? a.placeName;
@@ -470,12 +453,7 @@ export function PlacesSection() {
               )
             );
           })}
-          {!route.length && (
-            <Empty
-              title="아직 연결한 장소가 없어요"
-              description="일정에 장소를 연결하면 방문 순서를 확인할 수 있어요."
-            />
-          )}
+          {!route.length && <Empty title="아직 연결한 장소가 없어요" />}
         </>
       )}
     </>

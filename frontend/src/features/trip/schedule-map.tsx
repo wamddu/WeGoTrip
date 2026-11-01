@@ -84,15 +84,6 @@ export function ScheduleMap({
                 </Badge>
               ))}
           </View>
-          <Text style={s.small}>
-            점선은 일정의 방문 순서예요. 실제 도로 경로나 이동 시간은 포함하지
-            않아요.
-          </Text>
-          {route.located.length === 1 && (
-            <Text style={s.small}>
-              위치가 있는 일정이 2개 이상이면 연결선이 나타나요.
-            </Text>
-          )}
         </>
       ) : (
         <Empty
@@ -100,11 +91,6 @@ export function ScheduleMap({
             route.stops.length
               ? "장소의 위치를 등록해 주세요"
               : "아직 동선이 없어요"
-          }
-          description={
-            route.stops.length
-              ? "아래 일정의 장소에 위치를 저장하면 지도에 표시돼요."
-              : "일정과 방문 장소를 추가하면 하루의 동선을 볼 수 있어요."
           }
         />
       )}

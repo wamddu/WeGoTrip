@@ -255,7 +255,6 @@ export function ChatPhotoSheet({ onClose }: { onClose(): void }) {
           <View style={st.header}>
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={s.sectionTitle}>사진 선택</Text>
-              <Text style={s.small}>최근 사진 · 선택한 순서대로 전송해요</Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -358,13 +357,6 @@ export function ChatPhotoSheet({ onClose }: { onClose(): void }) {
                         {granted
                           ? "선택할 사진이 없어요"
                           : "사진 접근을 허용해 주세요"}
-                      </Text>
-                      <Text style={[s.small, { textAlign: "center" }]}>
-                        {Platform.OS === "web"
-                          ? "위 버튼으로 기기의 사진을 여러 장 가져올 수 있어요."
-                          : granted
-                            ? "기기에 저장된 사진을 여기에 표시해요."
-                            : "채팅에 보낼 사진을 목록에서 선택할 수 있어요."}
                       </Text>
                       {!granted && (
                         <Button

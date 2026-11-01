@@ -56,8 +56,8 @@ export async function uploadPhoto(
   try {
     // Resolve only selected originals, including photos stored in iCloud.
     let uri = await new Asset(photo.id).getUri();
-    let filename = photo.filename ?? "photo";
-    let mime = supported[filename.split(".").pop()?.toLowerCase() ?? ""];
+    const filename = photo.filename ?? "photo";
+    const mime = supported[filename.split(".").pop()?.toLowerCase() ?? ""];
     if (mime === "image/gif" && new LocalFile(uri).size > MAX_BYTES)
       throw new Error("GIF 사진은 8MB 이하로 선택해 주세요.");
     if (!mime || new LocalFile(uri).size > MAX_BYTES) {
@@ -79,8 +79,6 @@ export async function uploadPhoto(
         });
         uri = converted.uri;
         temporary = new LocalFile(uri);
-        filename = "photo.jpg";
-        mime = "image/jpeg";
       } finally {
         rendered?.release();
         context.release();
@@ -91,7 +89,8 @@ export async function uploadPhoto(
         "이 사진은 용량이 커요. 8MB 이하의 사진을 선택해 주세요.",
       );
     const form = new FormData();
-    form.append("file", { uri, name: filename, type: mime } as unknown as Blob);
+    // Expo's native fetch reads File bytes; URI-only multipart parts are unsupported.
+    form.append("file", new LocalFile(uri));
     return await api.upload(form);
   } finally {
     try {

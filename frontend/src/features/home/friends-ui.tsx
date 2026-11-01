@@ -1,4 +1,3 @@
-import type { PropsWithChildren } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon, type IconName, styles as s } from "../../ui/components";
 import { palette as p } from "../../ui/theme";
@@ -43,15 +42,16 @@ export function FriendTabs<T extends string>({
 export function FriendEmpty({
   icon = "users",
   title,
-  children,
-}: PropsWithChildren<{ icon?: IconName; title: string }>) {
+}: {
+  icon?: IconName;
+  title: string;
+}) {
   return (
     <View style={f.empty}>
       <View style={f.emptyIcon}>
         <Icon name={icon} size={26} color={p.primary} />
       </View>
       <Text style={s.strong}>{title}</Text>
-      <Text style={[s.body, { textAlign: "center" }]}>{children}</Text>
     </View>
   );
 }
@@ -64,12 +64,6 @@ export const f = StyleSheet.create({
     gap: 12,
     marginBottom: 22,
     overflow: "hidden",
-  },
-  eyebrow: {
-    color: p.primary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 2,
   },
   heroTitle: {
     fontSize: 27,

@@ -342,6 +342,7 @@ function useChatRoomState(enabled: boolean) {
     connected: loadedView === viewKey && connected,
     older,
     roomKey,
+    viewKey,
     send: (text: string, uploadId: string | null) =>
       create("message", { text, uploadId }),
     poll: (input: PollInput) => create("poll", input),

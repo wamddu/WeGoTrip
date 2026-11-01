@@ -108,7 +108,6 @@ export function NoticeEditor({
       <Page title="여행 공지" back>
         <Empty
           title="여행장만 공지를 관리할 수 있어요"
-          description="공지 목록에서 여행장의 안내를 확인해 주세요."
           action="공지 목록으로"
           onPress={leave}
         />
@@ -118,12 +117,7 @@ export function NoticeEditor({
     <Page title={itemId ? "공지 수정" : "공지 작성"} back>
       <ErrorMessage message={error} />
       {missing && !retry ? (
-        <Empty
-          title="삭제된 공지예요"
-          description="공지 목록에서 최신 내용을 확인해 주세요."
-          action="공지 목록으로"
-          onPress={leave}
-        />
+        <Empty title="삭제된 공지예요" action="공지 목록으로" onPress={leave} />
       ) : (
         <>
           <Field
@@ -150,11 +144,6 @@ export function NoticeEditor({
               if (!disabled) setPinned(!pinned);
             }}
           />
-          {!itemId && (
-            <Text style={s.small}>
-              여행 멤버들에게 공유하고 새 공지 알림을 보내요.
-            </Text>
-          )}
           {trip.archived && (
             <Text style={s.small}>종료한 여행의 공지는 수정할 수 없어요.</Text>
           )}

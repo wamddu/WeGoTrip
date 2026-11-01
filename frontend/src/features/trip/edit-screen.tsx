@@ -60,10 +60,7 @@ export default function EditScreen() {
   if (!trip || !(params.kind in titles))
     return (
       <Page title="항목을 찾을 수 없어요" back>
-        <Empty
-          title="다시 선택해 주세요"
-          description="내 여행에서 항목을 다시 열어 주세요."
-        />
+        <Empty title="다시 선택해 주세요" />
       </Page>
     );
   const kind = params.kind as Kind;
@@ -525,7 +522,6 @@ function Editor({
     <Page
       title={`${titles[kind]} ${kind === "settings" ? "" : itemId ? "수정" : "추가"}`}
       back
-      navigation={false}
       footer={
         kind === "expenses" ? (
           <View style={expenseStyles.footer}>
@@ -623,7 +619,6 @@ function Editor({
               {
                 value: null,
                 label: "장소 미정",
-                description: "나중에도 연결할 수 있어요",
               },
               ...trip.places.map((place) => ({
                 value: place.id,
@@ -773,17 +768,12 @@ function Editor({
                   {
                     value: null,
                     label: "모든 멤버가 각자 준비",
-                    description: `${trip.memberIds.length}명에게 개인 준비물이 하나씩 추가돼요`,
                   },
                 ]
               : []),
             ...people.map((person) => ({
               value: person.id,
               label: person.name,
-              description:
-                person.id === session!.user.id
-                  ? "내가 담당해요"
-                  : "이 멤버가 담당해요",
             })),
           ]}
           onChange={setOwner}
@@ -791,11 +781,6 @@ function Editor({
           placeholder="담당자를 선택해 주세요"
           searchPlaceholder="담당자 이름 검색"
           emptyText="일치하는 여행 멤버가 없어요."
-          hint={
-            !itemId && owner === null
-              ? `현재 여행 멤버 ${trip.memberIds.length}명에게 같은 이름의 준비물을 각각 추가해요. 각자 체크한 결과를 모두 함께 볼 수 있어요.`
-              : "모든 멤버가 목록을 볼 수 있고, 담당자만 체크할 수 있어요. 이 항목의 수정·삭제는 해당 담당자의 준비물에만 반영돼요."
-          }
           disabled={checklistDisabled || !!checklistRetry}
         />
       )}
@@ -870,14 +855,6 @@ function Editor({
             onPress={() => void retryChecklist()}
           />
         </View>
-      )}
-      {trip.serverVersion !== undefined && kind === "checklist" && (
-        <Text style={s.small}>준비물은 여행 멤버들과 함께 공유돼요.</Text>
-      )}
-      {trip.serverVersion !== undefined && kind === "notices" && (
-        <Text style={s.small}>
-          이 내용은 현재 이 기기에만 저장되며 다른 멤버에게 공유되지 않아요.
-        </Text>
       )}
       {(kind !== "expenses" || itemId) && (
         <View style={{ gap: 12, marginTop: 28 }}>

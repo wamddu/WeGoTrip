@@ -123,11 +123,6 @@ export function GeographicMap({
   return (
     <View style={st.frame}>
       <View style={st.toolbar}>
-        <Text style={st.hint}>
-          {onPick
-            ? "지도를 눌러 위치를 선택해요"
-            : "밀어서 이동 · 번호를 눌러 확인"}
-        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="동선 전체 보기"
@@ -328,6 +323,7 @@ const st = StyleSheet.create({
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: 8,
     paddingLeft: 12,
     paddingRight: 6,

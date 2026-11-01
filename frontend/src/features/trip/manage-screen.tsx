@@ -35,10 +35,7 @@ export default function ManageScreen() {
   if (!trip)
     return (
       <Page title="여행 정보" back>
-        <Empty
-          title="여행을 찾을 수 없어요"
-          description="내 여행에서 다시 선택해 주세요."
-        />
+        <Empty title="여행을 찾을 수 없어요" />
       </Page>
     );
   const owner = trip.ownerId === session!.user.id;
@@ -104,11 +101,6 @@ export default function ManageScreen() {
           />
           {tripApi && (
             <>
-              <Text style={s.small}>
-                코드는 7일간 유효하며 이 화면에서만 확인할 수 있어요. 새로
-                발급하면 이전 코드는 폐기돼요. 코드를 받은 사람은 친구가
-                아니어도 참여할 수 있어요.
-              </Text>
               <Button
                 title="새 초대 코드 발급"
                 secondary
@@ -175,11 +167,6 @@ export default function ManageScreen() {
         action="파티 만들기"
         onPress={() => router.push(editHref(trip.id, "parties"))}
       />
-      {tripApi && (
-        <Text style={s.small}>
-          파티는 여행 멤버와 공유돼요. 일정은 현재 이 기기에만 저장돼요.
-        </Text>
-      )}
       {trip.parties.map((party) => (
         <View key={party.id} style={{ marginBottom: 12 }}>
           <Card>
@@ -200,11 +187,6 @@ export default function ManageScreen() {
           </Card>
         </View>
       ))}
-      {!trip.parties.length && (
-        <Text style={s.body}>
-          잠깐 다른 일정을 보낼 멤버끼리 파티를 만들어 보세요.
-        </Text>
-      )}
       <ErrorMessage message={error} />
       <Confirm
         visible={!!codeAction}

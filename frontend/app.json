@@ -18,6 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "versionCode": 5,
       "package": "com.jeongheaum.frontend"
     },
     "web": {
@@ -64,6 +66,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "615bd075-cc3c-4fd8-8e6a-1f1a9a90f5a4"
+      }
+    },
+    "owner": "jeongheaum"
   }
 }

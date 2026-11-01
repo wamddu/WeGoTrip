@@ -43,8 +43,7 @@ export function DateFilter() {
         if (day) setDate(day);
       }}
       searchPlaceholder="날짜 또는 DAY 검색"
-      emptyText="찾는 날짜가 없어요. 여행 기간 안에서 검색해 주세요."
-      hint={`${days.length}일간의 여정 · 날짜를 선택해 일정을 확인하세요`}
+      emptyText="찾는 날짜가 없어요."
     />
   );
 }

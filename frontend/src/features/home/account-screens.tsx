@@ -88,7 +88,7 @@ export function NotificationsScreen() {
     "chat",
   ];
   return (
-    <Page title="알림" subtitle="함께하는 여행의 새로운 소식" refresh>
+    <Page title="알림" refresh>
       <ErrorMessage message={error} />
       {notifications.map((n) => (
         <Pressable
@@ -127,12 +127,7 @@ export function NotificationsScreen() {
         </Pressable>
       ))}
       <TripInvitations />
-      {!notifications.length && (
-        <Empty
-          title="아직 새로운 소식이 없어요"
-          description="일정 변경이나 새 공지가 생기면 여기서 알려드릴게요."
-        />
-      )}
+      {!notifications.length && <Empty title="아직 새로운 소식이 없어요" />}
     </Page>
   );
 }

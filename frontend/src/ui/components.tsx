@@ -107,17 +107,23 @@ export function Button({
   icon?: IconName;
 }) {
   const color = danger ? p.red : secondary ? p.primary : p.white;
+  const isDisabled = Boolean(disabled || loading);
   return (
     <Pressable
+      pointerEvents="box-only"
       accessibilityRole="button"
       accessibilityLabel={title}
-      disabled={disabled || loading}
+      disabled={isDisabled}
       onPress={onPress}
+      android_ripple={{
+        color: secondary || danger ? `${p.primary}26` : "#FFFFFF40",
+        foreground: true,
+      }}
       style={({ pressed }) => [
         styles.button,
         secondary && styles.secondaryButton,
         danger && { backgroundColor: p.coralSoft },
-        (disabled || loading || pressed) && { opacity: 0.6 },
+        (isDisabled || pressed) && { opacity: 0.6 },
       ]}
     >
       {loading ? (
@@ -259,7 +265,7 @@ export function Empty({
   onPress,
 }: {
   title: string;
-  description: string;
+  description?: string;
   action?: string;
   onPress?(): void;
 }) {
@@ -269,7 +275,11 @@ export function Empty({
         <Icon name="plane" color={p.primary} size={27} />
       </View>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={[styles.body, { textAlign: "center" }]}>{description}</Text>
+      {description && (
+        <Text style={[styles.body, { textAlign: "center" }]}>
+          {description}
+        </Text>
+      )}
       {action && onPress && <Button title={action} onPress={onPress} />}
     </View>
   );

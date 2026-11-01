@@ -124,11 +124,6 @@ export function ChatSection() {
               ? "아직 공유한 이미지가 없어요"
               : "첫 인사를 나눠 보세요"
           }
-          description={
-            chat.imagesOnly
-              ? "이 채팅방에 이미지를 공유하면 여기에 표시돼요."
-              : "사진을 공유하고, 가고 싶은 장소를 함께 투표해 보세요."
-          }
         />
       )}
     </>
@@ -294,9 +289,6 @@ function Message({
               <Text style={s.small}>
                 {participants}명 참여
                 {poll.allowMultiple ? ` · 총 ${total}표` : ""}
-                {!closed
-                  ? " · 선택한 항목을 다시 누르면 해당 표가 취소돼요"
-                  : ""}
               </Text>
               {!closed && (mine || trip?.ownerId === session?.user.id) && (
                 <Button
@@ -551,7 +543,6 @@ function PollForm({ onClose }: { onClose(): void }) {
           }}
         >
           <Text style={s.sectionTitle}>함께 결정해요</Text>
-          <Text style={s.small}>2~10개의 항목으로 투표해요.</Text>
           <TextInput
             accessibilityLabel="투표 질문"
             value={question}
@@ -628,11 +619,6 @@ function PollForm({ onClose }: { onClose(): void }) {
               </View>
             </Pressable>
           </View>
-          {allowMultiple && (
-            <Text style={s.small}>
-              여러 항목에 각각 한 표씩 선택할 수 있어요.
-            </Text>
-          )}
           {options.map((option, i) => (
             <Card key={i}>
               <View style={{ gap: 10 }}>

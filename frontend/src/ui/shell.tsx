@@ -1,5 +1,10 @@
 import { router, usePathname } from "expo-router";
-import { useState, type PropsWithChildren } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import {
   Modal,
   Platform,
@@ -16,32 +21,34 @@ import { useTravel } from "../state/travel-provider";
 import { Button, Icon, IconButton, styles as s } from "./components";
 import { palette as p } from "./theme";
 
+const FrameContext = createContext(false);
+
 export function Frame({ children }: PropsWithChildren) {
+  const insideFrame = useContext(FrameContext);
+  if (insideFrame) return <View style={st.screen}>{children}</View>;
   return (
-    <View style={st.outer}>
-      <SafeAreaView style={st.frame} edges={["top", "bottom"]}>
-        {children}
-      </SafeAreaView>
-    </View>
+    <FrameContext.Provider value={true}>
+      <View style={st.outer}>
+        <SafeAreaView style={st.frame} edges={["top", "bottom"]}>
+          {children}
+        </SafeAreaView>
+      </View>
+    </FrameContext.Provider>
   );
 }
 export function Page({
   children,
   title,
-  subtitle,
   back,
   right,
   footer,
   refresh = false,
-  navigation = true,
 }: PropsWithChildren<{
   title?: string;
-  subtitle?: string;
   back?: boolean;
   right?: React.ReactNode;
   footer?: React.ReactNode;
   refresh?: boolean;
-  navigation?: boolean;
 }>) {
   const state = useTravel();
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +67,6 @@ export function Page({
           )}
           <View style={s.flex}>
             <Text style={st.headerTitle}>{title}</Text>
-            {subtitle && <Text style={s.small}>{subtitle}</Text>}
           </View>
           {right}
         </View>
@@ -91,7 +97,6 @@ export function Page({
         </ScrollView>
         {footer}
       </KeyboardAvoidingView>
-      {navigation && <BottomBar />}
     </Frame>
   );
 }
@@ -199,6 +204,7 @@ export function Confirm({
 const st = StyleSheet.create({
   outer: { flex: 1, backgroundColor: "#E9F0F8", alignItems: "center" },
   frame: { flex: 1, width: "100%", maxWidth: 500, backgroundColor: p.bg },
+  screen: { flex: 1, minHeight: 0, backgroundColor: p.bg },
   header: {
     flexDirection: "row",
     paddingHorizontal: 19,

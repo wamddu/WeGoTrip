@@ -14,7 +14,7 @@ import { palette as p } from "../../ui/theme";
 import { useChatRoom } from "./chat-context";
 import { useTrip } from "./trip-context";
 
-export function ChatRoomSelector({ onViewChange }: { onViewChange(): void }) {
+export function ChatRoomSelector() {
   const { userApi, trip } = useTrip();
   const chat = useChatRoom();
   const [open, setOpen] = useState(false);
@@ -135,7 +135,6 @@ export function ChatRoomSelector({ onViewChange }: { onViewChange(): void }) {
           aria-checked={chat.imagesOnly}
           onPress={() => {
             setOpen(false);
-            onViewChange();
             chat.setImagesOnly(!chat.imagesOnly);
           }}
           style={({ pressed }) => [
@@ -213,7 +212,6 @@ export function ChatRoomSelector({ onViewChange }: { onViewChange(): void }) {
                     aria-selected={active}
                     onPress={() => {
                       if (!active) {
-                        onViewChange();
                         chat.setPartyId(option.id);
                       }
                       close();

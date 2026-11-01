@@ -1,0 +1,46 @@
+# EAS reads this file from the Git repository root instead of all .gitignore files.
+# Upload the Expo app, excluding server code, reports, and local credentials.
+.git
+/backend
+/docs
+/other_documents
+/output
+/tmp
+hs_err_pid*.log
+replay_pid*.log
+
+**/node_modules
+**/.expo
+**/.gradle
+**/.kotlin
+**/.metro-health-check*
+**/dist
+**/dist-native
+**/web-build
+**/coverage
+**/*.tsbuildinfo
+**/.DS_Store
+**/npm-debug.*
+**/yarn-debug.*
+**/yarn-error.*
+
+# EAS generates native projects from app.config.js for this build.
+/frontend/android
+/frontend/ios
+/frontend/example
+/frontend/expo-env.d.ts
+
+# Supply Firebase client configuration with an EAS file environment variable.
+**/.env
+**/.env.*
+**/google-services.json
+**/GoogleService-Info.plist
+**/credentials.json
+**/*.jks
+**/*.keystore
+**/*.p8
+**/*.p12
+**/*.key
+**/*.pem
+**/*.mobileprovision
+**/*.orig.*

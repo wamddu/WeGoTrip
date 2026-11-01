@@ -116,9 +116,6 @@ export function SchedulePager({
           <Text style={st.arrowText}>›</Text>
         </Pressable>
       </View>
-      {pages.length > 1 && (
-        <Text style={st.hint}>좌우로 밀어 팀별 일정을 확인하세요</Text>
-      )}
       {width > 0 && (
         <View style={{ overflow: "hidden", height: heights[partyId ?? "all"] }}>
           <Animated.View
@@ -184,11 +181,4 @@ const st = StyleSheet.create({
   dots: { flexDirection: "row", gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: p.border },
   activeDot: { width: 18, backgroundColor: p.primary },
-  hint: {
-    fontSize: 11,
-    color: p.secondary,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 6,
-  },
 });

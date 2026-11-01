@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { searchPlaces, type PlaceSearchResult } from "../../data/place-search";
 import { Button, ErrorMessage, Field, styles as s } from "../../ui/components";
-import { palette as p } from "../../ui/theme";
 
 export function PlaceSearch({
   onSelect,
@@ -69,14 +68,13 @@ export function PlaceSearch({
       />
       <Button
         title={loading ? "검색 중…" : "장소 검색"}
+        loading={loading}
         disabled={!query.trim() || loading}
         onPress={() => void search()}
       />
       <ErrorMessage message={error} />
       {searched && !results.length && (
-        <Text style={s.small}>
-          검색 결과가 없어요. 지역과 장소명을 함께 입력해 보세요.
-        </Text>
+        <Text style={s.small}>검색 결과가 없어요.</Text>
       )}
       {results.map((place) => (
         <Pressable
@@ -92,9 +90,6 @@ export function PlaceSearch({
         >
           <Text style={s.strong}>{place.name}</Text>
           <Text style={s.small}>{place.address}</Text>
-          <Text style={{ color: p.primary, fontSize: 12 }}>
-            선택해서 지도에서 확인
-          </Text>
         </Pressable>
       ))}
       {results.length > 0 && (

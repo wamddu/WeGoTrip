@@ -101,7 +101,6 @@ export default function AuthScreen() {
             <Text style={st.heroTitle}>
               함께 떠나는 여행,{"\n"}오래 남을 우리 이야기.
             </Text>
-            <Text style={st.heroSub}>계획부터 정산까지, 한곳에서 가볍게.</Text>
           </TravelCover>
           <View style={st.panel}>
             <View style={[s.row, { marginBottom: 24 }]}>
@@ -116,15 +115,10 @@ export default function AuthScreen() {
                 onPress={() => setRegister(true)}
               />
             </View>
-            <Text style={[s.sectionTitle, { marginBottom: 6 }]}>
+            <Text style={[s.sectionTitle, { marginBottom: 16 }]}>
               {register
                 ? "반가워요, 함께 떠나요"
                 : "다음 여행이 기다리고 있어요"}
-            </Text>
-            <Text style={[s.body, { marginBottom: 22 }]}>
-              {register
-                ? "여행을 함께할 프로필을 만들어 주세요."
-                : "다시 만나서 반가워요."}
             </Text>
             {register && (
               <Field
@@ -190,10 +184,6 @@ export default function AuthScreen() {
                   onPress={() => void submit(true)}
                   disabled={busy}
                 />
-                <Text style={st.localNote}>
-                  현재는 로컬 데이터 모드예요.{"\n"}이메일로 저장된 프로필을
-                  선택하며 비밀번호는 사용하지 않아요.
-                </Text>
               </>
             )}
           </View>
@@ -224,19 +214,11 @@ const st = StyleSheet.create({
     color: "#174675",
     marginTop: 23,
   },
-  heroSub: { color: "#3D7192", fontSize: 13, marginTop: 11 },
   panel: {
     backgroundColor: p.white,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 27,
     paddingBottom: 35,
-  },
-  localNote: {
-    fontSize: 11,
-    lineHeight: 18,
-    color: p.secondary,
-    marginTop: 16,
-    textAlign: "center",
   },
 });

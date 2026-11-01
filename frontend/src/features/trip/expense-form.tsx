@@ -120,9 +120,6 @@ export function ExpenseForm({
           />
           <Text style={st.won}>원</Text>
         </View>
-        <Text style={st.amountHint}>
-          한 사람이 결제한 전체 금액을 입력해 주세요
-        </Text>
       </View>
 
       <View style={st.card}>
@@ -134,7 +131,6 @@ export function ExpenseForm({
             <Text accessibilityRole="header" style={st.heading}>
               지출 정보
             </Text>
-            <Text style={st.caption}>무엇에 사용한 비용인가요?</Text>
           </View>
         </View>
         <Field
@@ -172,7 +168,6 @@ export function ExpenseForm({
             {
               value: null,
               label: "공동 지출",
-              description: "함께 부담할 멤버를 자유롭게 선택해요",
             },
             ...parties.map((party) => ({
               value: party.id,
@@ -196,7 +191,6 @@ export function ExpenseForm({
             <Text accessibilityRole="header" style={st.heading}>
               함께 나누기
             </Text>
-            <Text style={st.caption}>결제한 사람과 부담할 멤버를 선택해요</Text>
           </View>
         </View>
         <SelectField
@@ -205,7 +199,6 @@ export function ExpenseForm({
           options={people.map((person) => ({
             value: person.id,
             label: person.name,
-            description: "이 지출의 전체 금액을 결제한 멤버",
           }))}
           onChange={(id) => {
             if (id !== null) onPayerChange(id);
@@ -280,9 +273,6 @@ export function ExpenseForm({
             );
           })}
         </View>
-        <Text style={st.memberHint}>
-          결제한 사람도 함께 부담할 멤버에 포함할 수 있어요.
-        </Text>
       </View>
 
       <View style={st.card}>
@@ -294,7 +284,6 @@ export function ExpenseForm({
             <Text accessibilityRole="header" style={st.heading}>
               분담 금액
             </Text>
-            <Text style={st.caption}>각 멤버가 부담할 금액을 확인해요</Text>
           </View>
         </View>
         <View
@@ -327,11 +316,6 @@ export function ExpenseForm({
             </Pressable>
           ))}
         </View>
-        <Text style={st.splitHint}>
-          {split === "균등 분할"
-            ? "선택한 멤버끼리 자동으로 나눠요."
-            : "멤버별로 부담할 금액을 입력해 주세요."}
-        </Text>
         {selectedPeople.length ? (
           <View style={st.shares}>
             {selectedPeople.map((person, index) => (
@@ -380,9 +364,7 @@ export function ExpenseForm({
         ) : (
           <View style={st.noMembers}>
             <Icon name="users" color={p.secondary} size={22} />
-            <Text style={st.noMembersText}>
-              멤버를 선택하면 분담 금액이 나타나요
-            </Text>
+            <Text style={st.noMembersText}>선택한 멤버가 없어요</Text>
           </View>
         )}
         <View
@@ -420,11 +402,6 @@ export function ExpenseForm({
             </Text>
           </View>
         </View>
-        {split === "균등 분할" && selectedPeople.length > 1 && (
-          <Text style={st.roundingHint}>
-            1원 단위의 차이는 멤버 순서대로 나눠요.
-          </Text>
-        )}
       </View>
 
       <View style={st.card}>
@@ -513,7 +490,6 @@ const st = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   won: { fontSize: 21, fontWeight: "600", color: p.primaryDark },
-  amountHint: { fontSize: 12, lineHeight: 19, color: "#597A9F" },
   card: {
     backgroundColor: p.white,
     borderRadius: 21,
@@ -542,7 +518,6 @@ const st = StyleSheet.create({
     fontWeight: "700",
     color: p.ink,
   },
-  caption: { fontSize: 12, lineHeight: 18, marginTop: 3, color: p.secondary },
   label: { fontSize: 12, lineHeight: 18, color: p.ink, fontWeight: "600" },
   fieldInput: { backgroundColor: p.bg, fontSize: 14, minHeight: 50 },
   dateField: { gap: 8, marginBottom: 18 },
@@ -612,12 +587,6 @@ const st = StyleSheet.create({
     justifyContent: "center",
   },
   checked: { borderColor: p.primary, backgroundColor: p.primary },
-  memberHint: {
-    fontSize: 11,
-    lineHeight: 18,
-    color: p.secondary,
-    marginTop: 12,
-  },
   segmented: {
     flexDirection: "row",
     gap: 4,
@@ -645,13 +614,6 @@ const st = StyleSheet.create({
     color: p.secondary,
   },
   activeSegmentText: { color: p.primary },
-  splitHint: {
-    fontSize: 12,
-    lineHeight: 19,
-    color: p.secondary,
-    marginTop: 11,
-    marginBottom: 10,
-  },
   shares: { marginBottom: 15 },
   shareRow: {
     flexDirection: "row",
@@ -743,12 +705,6 @@ const st = StyleSheet.create({
     marginTop: 8,
   },
   summaryHint: { flex: 1, fontSize: 11, lineHeight: 17, color: p.secondary },
-  roundingHint: {
-    fontSize: 11,
-    lineHeight: 17,
-    color: p.secondary,
-    marginTop: 10,
-  },
   memoHeader: {
     flexDirection: "row",
     alignItems: "center",

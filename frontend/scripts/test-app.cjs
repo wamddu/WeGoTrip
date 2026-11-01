@@ -13,6 +13,287 @@ require.extensions[".ts"] = (module, filename) => {
 };
 const test = require("node:test");
 const assert = require("node:assert/strict");
+
+test("Buttons explicitly re-enable Android touch targets after disabled and loading states", () => {
+  const filename = require.resolve("../src/ui/components.tsx");
+  const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      jsx: ts.JsxEmit.ReactJSX,
+    },
+    fileName: filename,
+  });
+  const modules = {
+    "react/jsx-runtime": require("react/jsx-runtime"),
+    "expo-symbols": { SymbolView: "SymbolView" },
+    "react-native": {
+      Pressable: "Pressable",
+      Text: "Text",
+      View: "View",
+      ActivityIndicator: "ActivityIndicator",
+      StyleSheet: { create: (styles) => styles },
+    },
+    "./theme": { palette: { primary: "#1377E8", white: "#FFFFFF" } },
+  };
+  const exports = {};
+  require("node:vm").runInNewContext(compiled.outputText, {
+    exports,
+    require(name) {
+      assert.ok(Object.hasOwn(modules, name), `Unexpected UI import: ${name}`);
+      return modules[name];
+    },
+  });
+  // Android must receive false after true; undefined can leave the native View disabled.
+  for (const [state, expected] of [
+    [{ disabled: true }, true],
+    [{ disabled: false }, false],
+    [{ loading: true }, true],
+    [{ loading: false }, false],
+    [{ disabled: false, loading: false }, false],
+    [{ disabled: true, loading: false }, true],
+    [{}, false],
+  ]) {
+    const button = exports.Button({
+      title: "장소 검색",
+      onPress() {},
+      ...state,
+    });
+    assert.equal(button.props.disabled, expected, JSON.stringify(state));
+  }
+});
+
+const { bottomNavigation } = require("../src/ui/bottom-navigation.ts");
+const bottomNavigationTrip = {
+  id: "9223372036854775807",
+  ownerId: "1",
+  archived: false,
+};
+const bottomNavigationState = {
+  trips: [bottomNavigationTrip],
+  userId: "1",
+  busy: false,
+  loading: false,
+};
+
+test("Shared bottom navigation supports direct trip links with scoped create actions and bigint IDs", () => {
+  for (const [section, kind] of [
+    ["overview", "agenda"],
+    ["schedule", "agenda"],
+    ["places", "places"],
+    ["expenses", "expenses"],
+    ["checklist", "checklist"],
+    ["notices", "notices"],
+    ["unknown", "agenda"],
+  ]) {
+    assert.deepEqual(
+      bottomNavigation(
+        `/trip/${bottomNavigationTrip.id}/${section}`,
+        bottomNavigationState,
+      ),
+      {
+        visible: true,
+        addHref: {
+          pathname: "/trip/[tripId]/edit",
+          params: { tripId: bottomNavigationTrip.id, kind },
+        },
+        addDisabled: false,
+      },
+    );
+  }
+});
+
+test("Shared bottom navigation hides on auth, chat and creation screens and uses normal actions on main screens", () => {
+  for (const path of [
+    "/home",
+    "/trips",
+    "/notifications",
+    "/profile",
+    "/friends",
+    `/trip/${bottomNavigationTrip.id}/manage`,
+  ]) {
+    assert.deepEqual(bottomNavigation(path, bottomNavigationState), {
+      visible: true,
+      addHref: "/trip/new",
+      addDisabled: false,
+    });
+  }
+  for (const path of [
+    "/",
+    "/login",
+    "/trip/new",
+    `/trip/${bottomNavigationTrip.id}/chat`,
+    `/trip/${bottomNavigationTrip.id}/edit`,
+    "/trip/missing/overview",
+  ]) {
+    assert.equal(
+      bottomNavigation(path, bottomNavigationState).visible,
+      false,
+      path,
+    );
+  }
+  assert.deepEqual(
+    bottomNavigation("/trips/", bottomNavigationState),
+    bottomNavigation("/trips", bottomNavigationState),
+  );
+});
+
+test("Shared create actions retain checklist busy rules and notice owner permissions", () => {
+  for (const section of ["checklist", "notices"]) {
+    const path = `/trip/${bottomNavigationTrip.id}/${section}`;
+    for (const patch of [
+      { busy: true },
+      { loading: true },
+      { trips: [{ ...bottomNavigationTrip, archived: true }] },
+    ]) {
+      assert.equal(
+        bottomNavigation(path, { ...bottomNavigationState, ...patch })
+          .addDisabled,
+        true,
+      );
+    }
+    assert.equal(
+      bottomNavigation(path, { ...bottomNavigationState, userId: "2" })
+        .addDisabled,
+      section === "notices",
+    );
+    assert.equal(
+      bottomNavigation(path, bottomNavigationState).addDisabled,
+      false,
+    );
+  }
+});
+
+test("Shared navigation switches actions immediately between trips and clears removed trip actions", () => {
+  const otherTrip = { ...bottomNavigationTrip, id: "2", ownerId: "2" };
+  const state = {
+    ...bottomNavigationState,
+    trips: [bottomNavigationTrip, otherTrip],
+  };
+  assert.equal(
+    bottomNavigation(`/trip/${bottomNavigationTrip.id}/notices`, state)
+      .addDisabled,
+    false,
+  );
+  const other = bottomNavigation("/trip/2/notices", state);
+  assert.equal(other.addHref.params.tripId, "2");
+  assert.equal(other.addDisabled, true);
+  assert.deepEqual(bottomNavigation("/home", { ...state, busy: true }), {
+    visible: true,
+    addHref: "/trip/new",
+    addDisabled: false,
+  });
+  assert.equal(
+    bottomNavigation("/trip/2/notices", bottomNavigationState).visible,
+    false,
+  );
+  assert.equal(
+    bottomNavigation("/trip/2/notices", { ...state, userId: "2" }).addDisabled,
+    false,
+  );
+});
+
+const {
+  ChatScrollPosition,
+} = require("../src/features/trip/chat-scroll-position.ts");
+const chatMetrics = (contentHeight, viewportHeight, offsetY) => ({
+  contentHeight,
+  viewportHeight,
+  offsetY,
+});
+function settledChatScroll() {
+  const position = new ChatScrollPosition();
+  position.layoutChanged(300);
+  position.contentChanged(1000);
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1000, 300, 700));
+  return position;
+}
+
+test("Chat initial layout and delayed history events cannot cancel opening at the latest message", () => {
+  const position = new ChatScrollPosition();
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.scrolled(chatMetrics(0, 0, 0));
+  position.layoutChanged(300);
+  position.contentChanged(40);
+  position.scrolled(chatMetrics(40, 300, 0));
+  position.contentChanged(1000);
+  position.scrolled(chatMetrics(1000, 300, 0));
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1000, 300, 700));
+  assert.equal(position.shouldScrollToLatest(), true);
+});
+
+test("Chat waits for both viewport and content measurements in either callback order", () => {
+  for (const first of ["layout", "content"]) {
+    const position = new ChatScrollPosition();
+    if (first === "layout") position.layoutChanged(300);
+    else position.contentChanged(1000);
+    assert.equal(position.shouldScrollToLatest(), false);
+    if (first === "layout") position.contentChanged(1000);
+    else position.layoutChanged(300);
+    assert.equal(position.shouldScrollToLatest(), true);
+  }
+});
+
+test("New messages, loaded images and keyboard resizes keep following the latest message", () => {
+  const position = settledChatScroll();
+  // A scroll event with new dimensions can arrive before onContentSizeChange.
+  position.scrolled(chatMetrics(1300, 300, 700));
+  position.contentChanged(1300);
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1300, 300, 1000));
+  position.layoutChanged(200);
+  position.scrolled(chatMetrics(1300, 200, 1000));
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1300, 200, 1100));
+  position.contentChanged(1500);
+  assert.equal(position.shouldScrollToLatest(), true);
+});
+
+test("Reading older chat messages prevents appends, prepends and layout changes from forcing a jump", () => {
+  const position = settledChatScroll();
+  position.beginDrag();
+  position.scrolled(chatMetrics(1000, 300, 200));
+  position.contentChanged(1200);
+  position.scrolled(chatMetrics(1200, 300, 200));
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.layoutChanged(250);
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.contentChanged(1800);
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.scrolled(chatMetrics(1800, 250, 1520));
+  assert.equal(position.shouldScrollToLatest(), true);
+});
+
+test("Returning to a retained chat screen resets to the latest without requiring a size change", () => {
+  const position = settledChatScroll();
+  position.beginDrag();
+  position.scrolled(chatMetrics(1000, 300, 200));
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.reset();
+  position.scrolled(chatMetrics(1000, 300, 0));
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1000, 300, 700));
+  assert.equal(position.shouldScrollToLatest(), true);
+});
+
+test("A user drag or upward scroll can interrupt a pending automatic chat alignment", () => {
+  const position = new ChatScrollPosition();
+  position.layoutChanged(300);
+  position.contentChanged(1000);
+  position.beginDrag();
+  position.scrolled(chatMetrics(1000, 300, 200));
+  assert.equal(position.shouldScrollToLatest(), false);
+  position.reset();
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1000, 300, 700));
+  position.contentChanged(1300);
+  assert.equal(position.shouldScrollToLatest(), true);
+  position.scrolled(chatMetrics(1300, 300, 500));
+  assert.equal(position.shouldScrollToLatest(), false);
+});
+
 const {
   parseChatPush,
   chatPushHref,
@@ -271,6 +552,174 @@ const webPng = (animated = false) =>
     10,
     ...pngChunk(animated ? "acTL" : "IDAT"),
   ]);
+
+function nativePhotoFixture(photo, original, converted) {
+  const { installFormDataPatch } = require("expo/src/winter/FormData.ts");
+  const {
+    convertFormDataAsync,
+  } = require("expo/src/winter/fetch/convertFormData.ts");
+  const NativeFormData = installFormDataPatch(
+    class {
+      _parts = [];
+    },
+  );
+  const originalUri = "content://media/external/images/media/42";
+  const convertedUri = "file:///cache/converted.jpg";
+  const files = new Map([
+    [originalUri, original],
+    [convertedUri, converted],
+  ]);
+  const deleted = [];
+  const released = [];
+  const modules = {
+    "expo-media-library": {
+      Asset: class {
+        async getUri() {
+          return originalUri;
+        }
+      },
+    },
+    "expo-file-system": {
+      File: class {
+        constructor(uri) {
+          this.uri = uri;
+        }
+        get size() {
+          return files.get(this.uri).byteLength;
+        }
+        get exists() {
+          return files.has(this.uri);
+        }
+        get name() {
+          return this.uri.split("/").pop();
+        }
+        get type() {
+          return this.uri === convertedUri ? "image/jpeg" : photo.mimeType;
+        }
+        async bytes() {
+          return files.get(this.uri).slice();
+        }
+        delete() {
+          deleted.push(this.uri);
+          files.delete(this.uri);
+        }
+      },
+    },
+    "expo-image-manipulator": {
+      SaveFormat: { JPEG: "jpeg" },
+      ImageManipulator: {
+        manipulate: () => ({
+          async renderAsync() {
+            return {
+              saveAsync: async () => ({ uri: convertedUri }),
+              release: () => released.push("rendered"),
+            };
+          },
+          release: () => released.push("context"),
+        }),
+      },
+    },
+  };
+  const filename = require.resolve("../src/data/chat-photo-library.ts");
+  const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+    fileName: filename,
+  });
+  const exports = {};
+  require("node:vm").runInNewContext(compiled.outputText, {
+    exports,
+    Blob: class {
+      constructor() {
+        throw new Error(
+          "React Native Blob cannot be constructed from binary data",
+        );
+      }
+    },
+    FormData: NativeFormData,
+    require(name) {
+      assert.ok(
+        Object.hasOwn(modules, name),
+        `Unexpected native import: ${name}`,
+      );
+      return modules[name];
+    },
+  });
+  return {
+    deleted,
+    released,
+    originalUri,
+    convertedUri,
+    upload: (api) => exports.uploadPhoto(photo, api),
+    serialize: (form) => convertFormDataAsync(form, "test-boundary"),
+  };
+}
+
+test("Native chat photos serialize real JPG, PNG and GIF bytes with Expo's multipart encoder", async () => {
+  for (const [extension, mime] of [
+    ["jpg", "image/jpeg"],
+    ["png", "image/png"],
+    ["gif", "image/gif"],
+  ]) {
+    const original = new Uint8Array([0, 1, 127, 128, 255]);
+    const fixture = nativePhotoFixture(
+      { id: "42", filename: `photo.${extension}`, mimeType: mime },
+      original,
+    );
+    const result = await fixture.upload({
+      async upload(form) {
+        const file = form.get("file");
+        assert.equal(file.type, mime);
+        assert.equal(file.name, "42");
+        assert.deepEqual(await file.bytes(), original);
+        const { body } = await fixture.serialize(form);
+        const header = Buffer.from(
+          `--test-boundary\r\ncontent-disposition: form-data; name="file"; filename="42"\r\ncontent-type: ${mime}\r\n\r\n`,
+        );
+        assert.deepEqual(
+          Buffer.from(body),
+          Buffer.concat([
+            header,
+            original,
+            Buffer.from("\r\n--test-boundary--\r\n"),
+          ]),
+        );
+        return { id: "uploaded" };
+      },
+    });
+    assert.equal(result.id, "uploaded");
+    assert.deepEqual(fixture.deleted, []);
+  }
+});
+
+test("Native converted photos send JPEG bytes and clean only the cache file after success or failure", async () => {
+  for (const fail of [false, true]) {
+    const converted = new Uint8Array([255, 216, 255, 1]);
+    const fixture = nativePhotoFixture(
+      { id: "42", filename: "photo.heic" },
+      new Uint8Array([1]),
+      converted,
+    );
+    const task = fixture.upload({
+      async upload(form) {
+        const file = form.get("file");
+        assert.equal(file.type, "image/jpeg");
+        assert.equal(file.name, "converted.jpg");
+        assert.deepEqual(await file.bytes(), converted);
+        await fixture.serialize(form);
+        assert.deepEqual(fixture.deleted, []);
+        if (fail) throw new Error("upload failed");
+        return { id: "uploaded" };
+      },
+    });
+    if (fail) await assert.rejects(task, /upload failed/);
+    else assert.equal((await task).id, "uploaded");
+    assert.deepEqual(fixture.deleted, [fixture.convertedUri]);
+    assert.deepEqual(fixture.released, ["rendered", "context"]);
+  }
+});
 
 function photoBrowserFixture(t) {
   const state = {

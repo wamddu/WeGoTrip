@@ -120,10 +120,6 @@ export function ChecklistSection() {
             ]}
           />
         </View>
-        <Text style={s.small}>
-          모두가 챙기는 준비물도 각자의 항목으로 관리해요. 내가 맡은 준비물만
-          체크할 수 있어요.
-        </Text>
       </Card>
       {memberProgress.length > 0 && (
         <>
@@ -166,12 +162,6 @@ export function ChecklistSection() {
             ))}
           </Card>
         </>
-      )}
-      {trip.legacyChecklistPreserved && (
-        <Text style={[s.small, { marginTop: 14 }]}>
-          준비물은 이제 멤버들과 공유돼요. 이전에 이 기기에 저장한 목록은 별도로
-          보관되며 공유 목록에 자동으로 합쳐지지 않아요.
-        </Text>
       )}
       <View style={{ marginTop: 20 }}>
         <SelectField
@@ -300,12 +290,7 @@ export function ChecklistSection() {
           </Pressable>
         </View>
       ))}
-      {!list.length && (
-        <Empty
-          title="확인할 준비물이 없어요"
-          description="준비물을 추가하거나 다른 필터를 선택해 보세요."
-        />
-      )}
+      {!list.length && <Empty title="확인할 준비물이 없어요" />}
     </>
   );
 }
@@ -370,21 +355,10 @@ export function NoticesSection() {
           </Card>
         </View>
       ))}
-      {!notices.length && (
-        <Empty
-          title="아직 작성한 공지가 없어요"
-          description="집합 장소나 꼭 알아둘 내용을 남겨 보세요."
-        />
-      )}
+      {!notices.length && <Empty title="아직 작성한 공지가 없어요" />}
       {noticeId && !notices.some((notice) => notice.id === noticeId) && (
         <Text style={s.small}>
           알림의 공지가 삭제됐거나 더 이상 표시되지 않아요.
-        </Text>
-      )}
-      {trip.legacyNoticesPreserved && (
-        <Text style={s.small}>
-          이 기기에 저장된 이전 공지는 원본 그대로 보관했어요. 새 공지부터
-          멤버들과 공유돼요.
         </Text>
       )}
     </>
@@ -455,12 +429,7 @@ export function ChatSection() {
           </View>
         );
       })}
-      {!trip.messages.length && (
-        <Empty
-          title="첫 인사를 나눠 보세요"
-          description="여행에서 하고 싶은 이야기를 남겨 주세요."
-        />
-      )}
+      {!trip.messages.length && <Empty title="첫 인사를 나눠 보세요" />}
     </>
   );
 }
