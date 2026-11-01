@@ -1,5 +1,5 @@
 import { createPushPlatform } from "./platform";
-import { pushText, type PushHandlers } from "./push-message";
+import { pushIdentifier, pushText, type PushHandlers } from "./push-message";
 
 export async function listenPushes(
   handlers: PushHandlers,
@@ -32,7 +32,7 @@ export async function listenPushes(
       return;
     await notifications
       .scheduleNotificationAsync({
-        identifier: `push-${message.data?.deliveryId}`,
+        identifier: pushIdentifier(message.data),
         content: {
           ...pushText(message.data),
           data: message.data,

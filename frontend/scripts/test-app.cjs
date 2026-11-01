@@ -300,6 +300,7 @@ const {
   parsePush,
   pushHref,
   pushText,
+  pushIdentifier,
   SeenPushes,
 } = require("../src/notifications/push-message.ts");
 
@@ -402,6 +403,91 @@ test("Notice push opens only the scoped notice screen and never renders remote b
   assert.equal(seen.accept("open", push), true);
 });
 
+const previewPush = {
+  type: "CHAT_MESSAGE",
+  recipientId: "1",
+  tripId: "2",
+  partyId: "",
+  messageId: "3",
+  eventId: "4",
+  deliveryId: "5",
+  title: "테스트 여행 · 전체 채팅",
+  body: "민수: 곧 도착해요",
+};
+
+test("Chat push displays room and message preview while older payloads keep their fallback", () => {
+  assert.deepEqual(pushText(previewPush), {
+    title: previewPush.title,
+    body: previewPush.body,
+  });
+  assert.deepEqual(
+    pushText({ ...previewPush, title: undefined, body: undefined }),
+    {
+      title: "새 채팅 메시지",
+      body: "참여 중인 여행 채팅에 새 메시지가 도착했어요.",
+    },
+  );
+  assert.equal(
+    pushText({ ...previewPush, tripId: "../other" }).title,
+    "새 채팅 메시지",
+  );
+  assert.equal(
+    pushText({ ...previewPush, title: {}, body: null }).title,
+    "새 채팅 메시지",
+  );
+  assert.equal(parseChatPush(previewPush).title, undefined);
+});
+
+test("Chat previews normalize whitespace and bound Unicode text without splitting emoji", () => {
+  assert.equal(
+    pushText({ ...previewPush, body: " 민수:\n\t안녕 " }).body,
+    "민수: 안녕",
+  );
+  const content = pushText({
+    ...previewPush,
+    title: "😀".repeat(130),
+    body: "😀".repeat(250),
+  });
+  assert.equal(Array.from(content.title).length, 120);
+  assert.equal(Array.from(content.body).length, 240);
+  assert.ok(content.body.endsWith("😀…"));
+  assert.ok(!content.body.includes("\uFFFD"));
+});
+
+test("Push cards update per recipient and room while trips, groups, and notices remain separate", () => {
+  assert.equal(pushIdentifier(previewPush), "chat-1-2-all");
+  assert.equal(
+    pushIdentifier({
+      ...previewPush,
+      messageId: "6",
+      eventId: "7",
+      deliveryId: "8",
+    }),
+    pushIdentifier(previewPush),
+  );
+  const keys = [
+    previewPush,
+    { ...previewPush, partyId: "3" },
+    { ...previewPush, partyId: "4" },
+    { ...previewPush, tripId: "3" },
+    { ...previewPush, recipientId: "2" },
+    {
+      type: "TRIP_NOTICE",
+      recipientId: "1",
+      tripId: "2",
+      noticeId: "3",
+      eventId: "4",
+      deliveryId: "5",
+    },
+  ].map(pushIdentifier);
+  assert.equal(new Set(keys).size, keys.length);
+  assert.equal(keys.at(-1), "notice-1-3");
+  assert.equal(
+    pushIdentifier({ ...previewPush, partyId: "../group" }),
+    undefined,
+  );
+});
+
 test("Web push click focuses an existing app or opens only its own origin", async () => {
   const vm = require("node:vm");
   let listener, opened, forwarded;
@@ -456,6 +542,14 @@ test("Web push click focuses an existing app or opens only its own origin", asyn
   };
   await click();
   assert.equal(new URL(opened).origin, "https://app.example");
+  data.title = "테스트 여행 · 전체 채팅";
+  data.body = "😀".repeat(2000);
+  await click();
+  const openedPayload = JSON.parse(new URL(opened).searchParams.get("push"));
+  assert.equal(openedPayload.title, undefined);
+  assert.equal(openedPayload.body, undefined);
+  assert.equal(openedPayload.url, undefined);
+  assert.ok(new URL(opened).searchParams.get("push").length < 2048);
   assert.equal(
     JSON.parse(new URL(opened).searchParams.get("push")).tripId,
     "2",
@@ -480,6 +574,7 @@ test("Web push click focuses an existing app or opens only its own origin", asyn
   data.noticeId = "6";
   await click();
   assert.equal(forwarded.payload.noticeId, "6");
+  assert.equal(forwarded.payload.body, undefined);
   assert.equal(forwarded.type, "WEGOTRIP_PUSH_OPEN");
 });
 const {

@@ -1,7 +1,7 @@
 import { getApps } from "firebase/app";
 import { getMessaging, onMessage } from "firebase/messaging";
 import { createPushPlatform } from "./platform.web";
-import { pushText, type PushHandlers } from "./push-message";
+import { pushIdentifier, pushText, type PushHandlers } from "./push-message";
 
 export async function listenPushes(
   handlers: PushHandlers,
@@ -42,7 +42,7 @@ export async function listenPushes(
         const content = pushText(message.data);
         const notification = new Notification(content.title, {
           body: content.body,
-          tag: `push-${message.data?.deliveryId}`,
+          tag: pushIdentifier(message.data),
         });
         notification.onclick = () => {
           window.focus();

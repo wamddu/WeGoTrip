@@ -35,6 +35,10 @@ import {
   ChatComposer as LocalChatComposer,
 } from "./collaboration-sections";
 import { useChatRoom } from "./chat-context";
+import {
+  sameChatMessageGroup,
+  showChatMessageTime,
+} from "./chat-message-group";
 import { ChatPhotoSheet } from "./chat-photo-sheet";
 import { PollDeadlineField } from "./poll-deadline-input";
 import { usePollTimer } from "./use-poll-timer";
@@ -108,6 +112,9 @@ export function ChatSection() {
         <Message
           key={message.id}
           message={message}
+          showAuthor={!sameChatMessageGroup(message, chat.messages[i - 1])}
+          compactAfter={sameChatMessageGroup(message, chat.messages[i + 1])}
+          showTime={showChatMessageTime(message, chat.messages[i + 1])}
           showDate={
             !i ||
             new Date(message.createdAt).toLocaleDateString("ko-KR") !==
@@ -132,9 +139,15 @@ export function ChatSection() {
 function Message({
   message: m,
   showDate,
+  showAuthor,
+  compactAfter,
+  showTime,
 }: {
   message: ChatMessage;
   showDate: boolean;
+  showAuthor: boolean;
+  compactAfter: boolean;
+  showTime: boolean;
 }) {
   const { session, trip } = useTrip();
   const chat = useChatRoom();
@@ -153,162 +166,177 @@ function Message({
           {new Date(m.createdAt).toLocaleDateString("ko-KR")}
         </Text>
       )}
-      <View style={[st.message, mine && { alignItems: "flex-end" }]}>
-        <Text style={s.small}>{mine ? "나" : m.authorName}</Text>
-        <View
-          style={[
-            st.bubble,
-            mine && !poll && !m.imageUrl && st.mine,
-            !!m.imageUrl && st.imageBubble,
-            poll && { alignSelf: "stretch" },
-          ]}
-        >
-          {m.imageUrl && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="이미지 크게 보기"
-              onPress={() => setExpanded(true)}
-            >
-              <Image
-                source={{ uri: m.imageUrl }}
-                style={st.image}
-                contentFit="contain"
-                accessibilityLabel="채팅에 공유한 이미지"
-              />
-            </Pressable>
-          )}
-          {!!m.text && (
-            <Text
-              selectable
-              style={[s.body, mine && !m.imageUrl && { color: p.white }]}
-            >
-              {m.text}
-            </Text>
-          )}
-          {poll && (
-            <View style={{ gap: 10 }}>
-              <Text style={[s.small, { color: p.primary }]}>
-                {closed ? "마감된 투표" : "투표"} ·{" "}
-                {poll.allowMultiple ? "복수 선택" : "1인 1표"}
+      <View
+        style={[
+          st.message,
+          compactAfter && st.groupedMessage,
+          mine && { alignItems: "flex-end" },
+        ]}
+      >
+        {showAuthor && (
+          <Text style={s.small}>{mine ? "나" : m.authorName}</Text>
+        )}
+        <View style={[st.bubbleRow, mine && st.ownBubbleRow]}>
+          <View
+            style={[
+              st.bubble,
+              mine && !poll && !m.imageUrl && st.mine,
+              !!m.imageUrl && st.imageBubble,
+              poll && st.pollBubble,
+            ]}
+          >
+            {m.imageUrl && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="이미지 크게 보기"
+                onPress={() => setExpanded(true)}
+              >
+                <Image
+                  source={{ uri: m.imageUrl }}
+                  style={st.image}
+                  contentFit="contain"
+                  accessibilityLabel="채팅에 공유한 이미지"
+                />
+              </Pressable>
+            )}
+            {!!m.text && (
+              <Text
+                selectable
+                style={[s.body, mine && !m.imageUrl && { color: p.white }]}
+              >
+                {m.text}
               </Text>
-              <Text style={s.sectionTitle}>{poll.question}</Text>
-              {!!poll.closesAt && (
-                <View style={st.pollDeadline}>
-                  <Text
-                    style={[
-                      s.small,
-                      {
-                        color: closed ? p.secondary : p.primary,
-                        fontWeight: "700",
-                      },
-                    ]}
-                  >
-                    {closed ? "마감됨" : formatPollRemaining(remaining ?? 0)}
-                  </Text>
-                  <Text style={s.small}>
-                    마감 기한 ·{" "}
-                    {new Date(poll.closesAt).toLocaleString("ko-KR", {
-                      month: "long",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false,
-                    })}
-                  </Text>
-                </View>
-              )}
-              {poll.options.map((option) => {
-                const selected = (
-                  poll.myOptionIds ?? (poll.myOptionId ? [poll.myOptionId] : [])
-                ).includes(option.id);
-                return (
-                  <Pressable
-                    key={option.id}
-                    accessibilityRole={
-                      poll.allowMultiple ? "checkbox" : "radio"
-                    }
-                    accessibilityLabel={`${option.label}, ${option.votes}표${selected ? ", 내 선택" : ""}`}
-                    accessibilityState={{
-                      checked: selected,
-                      disabled: !!disabled,
-                    }}
+            )}
+            {poll && (
+              <View style={{ gap: 10 }}>
+                <Text style={[s.small, { color: p.primary }]}>
+                  {closed ? "마감된 투표" : "투표"} ·{" "}
+                  {poll.allowMultiple ? "복수 선택" : "1인 1표"}
+                </Text>
+                <Text style={s.sectionTitle}>{poll.question}</Text>
+                {!!poll.closesAt && (
+                  <View style={st.pollDeadline}>
+                    <Text
+                      style={[
+                        s.small,
+                        {
+                          color: closed ? p.secondary : p.primary,
+                          fontWeight: "700",
+                        },
+                      ]}
+                    >
+                      {closed ? "마감됨" : formatPollRemaining(remaining ?? 0)}
+                    </Text>
+                    <Text style={s.small}>
+                      마감 기한 ·{" "}
+                      {new Date(poll.closesAt).toLocaleString("ko-KR", {
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
+                    </Text>
+                  </View>
+                )}
+                {poll.options.map((option) => {
+                  const selected = (
+                    poll.myOptionIds ??
+                    (poll.myOptionId ? [poll.myOptionId] : [])
+                  ).includes(option.id);
+                  return (
+                    <Pressable
+                      key={option.id}
+                      accessibilityRole={
+                        poll.allowMultiple ? "checkbox" : "radio"
+                      }
+                      accessibilityLabel={`${option.label}, ${option.votes}표${selected ? ", 내 선택" : ""}`}
+                      accessibilityState={{
+                        checked: selected,
+                        disabled: !!disabled,
+                      }}
+                      disabled={disabled}
+                      onPress={() =>
+                        void chat
+                          .vote(
+                            poll.id,
+                            poll.allowMultiple
+                              ? option.id
+                              : selected
+                                ? null
+                                : option.id,
+                            poll.allowMultiple ? !selected : undefined,
+                          )
+                          .catch(() => undefined)
+                      }
+                      style={[
+                        st.option,
+                        selected && {
+                          borderColor: p.primary,
+                          backgroundColor: p.blueSoft,
+                        },
+                      ]}
+                    >
+                      <View style={s.between}>
+                        <Text style={[s.strong, { flex: 1 }]}>
+                          {selected ? "✓ " : ""}
+                          {option.label}
+                        </Text>
+                        <Text style={s.small}>
+                          {option.votes}표 ·{" "}
+                          {participants
+                            ? Math.round((option.votes / participants) * 100)
+                            : 0}
+                          %
+                        </Text>
+                      </View>
+                      {!!option.placeName && (
+                        <Text style={s.small}>
+                          📍 {option.placeName}
+                          {option.placeAddress
+                            ? ` · ${option.placeAddress}`
+                            : ""}
+                          {!option.placeId ? " · 삭제된 장소" : ""}
+                        </Text>
+                      )}
+                      <View style={st.track}>
+                        <View
+                          style={{
+                            height: 4,
+                            width: `${participants ? (option.votes / participants) * 100 : 0}%`,
+                            backgroundColor: p.primary,
+                          }}
+                        />
+                      </View>
+                    </Pressable>
+                  );
+                })}
+                <Text style={s.small}>
+                  {participants}명 참여
+                  {poll.allowMultiple ? ` · 총 ${total}표` : ""}
+                </Text>
+                {!closed && (mine || trip?.ownerId === session?.user.id) && (
+                  <Button
+                    title="투표 마감"
+                    secondary
                     disabled={disabled}
                     onPress={() =>
-                      void chat
-                        .vote(
-                          poll.id,
-                          poll.allowMultiple
-                            ? option.id
-                            : selected
-                              ? null
-                              : option.id,
-                          poll.allowMultiple ? !selected : undefined,
-                        )
-                        .catch(() => undefined)
+                      void chat.close(poll.id).catch(() => undefined)
                     }
-                    style={[
-                      st.option,
-                      selected && {
-                        borderColor: p.primary,
-                        backgroundColor: p.blueSoft,
-                      },
-                    ]}
-                  >
-                    <View style={s.between}>
-                      <Text style={[s.strong, { flex: 1 }]}>
-                        {selected ? "✓ " : ""}
-                        {option.label}
-                      </Text>
-                      <Text style={s.small}>
-                        {option.votes}표 ·{" "}
-                        {participants
-                          ? Math.round((option.votes / participants) * 100)
-                          : 0}
-                        %
-                      </Text>
-                    </View>
-                    {!!option.placeName && (
-                      <Text style={s.small}>
-                        📍 {option.placeName}
-                        {option.placeAddress ? ` · ${option.placeAddress}` : ""}
-                        {!option.placeId ? " · 삭제된 장소" : ""}
-                      </Text>
-                    )}
-                    <View style={st.track}>
-                      <View
-                        style={{
-                          height: 4,
-                          width: `${participants ? (option.votes / participants) * 100 : 0}%`,
-                          backgroundColor: p.primary,
-                        }}
-                      />
-                    </View>
-                  </Pressable>
-                );
+                  />
+                )}
+              </View>
+            )}
+          </View>
+          {showTime && (
+            <Text style={st.time} numberOfLines={1}>
+              {new Date(m.createdAt).toLocaleTimeString("ko-KR", {
+                hour: "2-digit",
+                minute: "2-digit",
               })}
-              <Text style={s.small}>
-                {participants}명 참여
-                {poll.allowMultiple ? ` · 총 ${total}표` : ""}
-              </Text>
-              {!closed && (mine || trip?.ownerId === session?.user.id) && (
-                <Button
-                  title="투표 마감"
-                  secondary
-                  disabled={disabled}
-                  onPress={() =>
-                    void chat.close(poll.id).catch(() => undefined)
-                  }
-                />
-              )}
-            </View>
+            </Text>
           )}
         </View>
-        <Text style={st.time}>
-          {new Date(m.createdAt).toLocaleTimeString("ko-KR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </Text>
       </View>
       <Modal
         visible={expanded}
@@ -747,19 +775,36 @@ const st = StyleSheet.create({
     marginVertical: 20,
   },
   message: { alignItems: "flex-start", gap: 5, marginBottom: 18 },
+  groupedMessage: { marginBottom: 6 },
+  bubbleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    width: "100%",
+  },
+  ownBubbleRow: { flexDirection: "row-reverse" },
   bubble: {
     backgroundColor: p.white,
     borderColor: p.border,
     borderWidth: 1,
     borderRadius: 16,
-    padding: 14,
-    maxWidth: "94%",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    maxWidth: "85%",
+    minWidth: 0,
+    flexShrink: 1,
     gap: 8,
   },
+  pollBubble: { flex: 1 },
   mine: { backgroundColor: p.primary, borderColor: p.primary },
-  imageBubble: { backgroundColor: "transparent", borderWidth: 0, padding: 0 },
+  imageBubble: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   image: { width: 240, height: 180, borderRadius: 8, maxWidth: "100%" },
-  time: { fontSize: 10, color: p.secondary },
+  time: { fontSize: 10, color: p.secondary, flexShrink: 0, marginBottom: 2 },
   option: {
     borderWidth: 1,
     borderColor: p.border,

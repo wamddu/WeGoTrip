@@ -106,12 +106,36 @@ export function pushHref(push: AppPush) {
       };
 }
 export function pushText(raw: unknown) {
-  return parsePush(raw)?.type === "TRIP_NOTICE"
+  const push = parsePush(raw);
+  if (push?.type === "CHAT_MESSAGE") {
+    const data = raw as Record<string, unknown>;
+    if (typeof data.title === "string" && typeof data.body === "string") {
+      const title = previewText(data.title, 120);
+      const body = previewText(data.body, 240);
+      if (title && body) return { title, body };
+    }
+  }
+  return push?.type === "TRIP_NOTICE"
     ? { title: "새 여행 공지", body: "참여 중인 여행에 새 공지가 등록됐어요." }
     : {
         title: "새 채팅 메시지",
         body: "참여 중인 여행 채팅에 새 메시지가 도착했어요.",
       };
+}
+
+function previewText(text: string, limit: number) {
+  const characters = Array.from(text.replace(/[\s\p{Cc}]+/gu, " ").trim());
+  return characters.length > limit
+    ? characters.slice(0, limit - 1).join("") + "…"
+    : characters.join("");
+}
+
+export function pushIdentifier(raw: unknown): string | undefined {
+  const push = parsePush(raw);
+  if (!push) return undefined;
+  return push.type === "CHAT_MESSAGE"
+    ? `chat-${push.recipientId}-${push.tripId}-${push.partyId || "all"}`
+    : `notice-${push.recipientId}-${push.noticeId}`;
 }
 
 export interface PushHandlers {

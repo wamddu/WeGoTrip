@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "dependencies": {
     "@expo/ui": "~57.0.16",
     "@react-native-firebase/app": "^26.4.0",

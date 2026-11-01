@@ -21,6 +21,10 @@ import { editHref } from "./shared";
 import { useTrip } from "./trip-context";
 import { tripHref } from "../home/home-screen";
 import { SelectField } from "../../ui/select-field";
+import {
+  sameChatMessageGroup,
+  showChatMessageTime,
+} from "./chat-message-group";
 
 export function ChecklistSection() {
   const {
@@ -394,6 +398,9 @@ export function ChatSection() {
       {trip.messages.map((m, i) => {
         const mine = m.authorId === session!.user.id;
         const author = data!.users.find((u) => u.id === m.authorId);
+        const showAuthor = !sameChatMessageGroup(m, trip.messages[i - 1]);
+        const compactAfter = sameChatMessageGroup(m, trip.messages[i + 1]);
+        const showTime = showChatMessageTime(m, trip.messages[i + 1]);
         const date = new Date(m.createdAt);
         const day = date.toLocaleDateString("ko-KR");
         const previous =
@@ -406,24 +413,38 @@ export function ChatSection() {
           <View key={m.id}>
             {day !== previous && <Text style={st.date}>{day}</Text>}
             <View
-              style={[st.messageRow, mine && { flexDirection: "row-reverse" }]}
+              style={[
+                st.messageRow,
+                compactAfter && st.groupedMessage,
+                mine && { flexDirection: "row-reverse" },
+              ]}
             >
-              {!mine && <Avatar user={author} />}
+              {!mine && (
+                <View style={st.avatarSlot}>
+                  {showAuthor && <Avatar user={author} />}
+                </View>
+              )}
               <View
                 style={[st.messageColumn, mine && { alignItems: "flex-end" }]}
               >
-                {!mine && <Text style={s.small}>{author?.name}</Text>}
-                <View style={[st.bubble, mine && st.mine]}>
-                  <Text style={[st.messageText, mine && { color: p.white }]}>
-                    {m.text}
-                  </Text>
+                {!mine && showAuthor && (
+                  <Text style={s.small}>{author?.name}</Text>
+                )}
+                <View style={[st.bubbleRow, mine && st.ownBubbleRow]}>
+                  <View style={[st.bubble, mine && st.mine]}>
+                    <Text style={[st.messageText, mine && { color: p.white }]}>
+                      {m.text}
+                    </Text>
+                  </View>
+                  {showTime && (
+                    <Text style={st.timestamp} numberOfLines={1}>
+                      {date.toLocaleTimeString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  )}
                 </View>
-                <Text style={st.timestamp}>
-                  {date.toLocaleTimeString("ko-KR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
               </View>
             </View>
           </View>
@@ -540,14 +561,27 @@ const st = StyleSheet.create({
     marginBottom: 22,
     alignItems: "flex-start",
   },
-  messageColumn: { maxWidth: "83%", gap: 5, alignItems: "flex-start" },
+  groupedMessage: { marginBottom: 6 },
+  avatarSlot: { width: 32, flexShrink: 0 },
+  messageColumn: { flex: 1, minWidth: 0, gap: 5, alignItems: "flex-start" },
+  bubbleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    width: "100%",
+  },
+  ownBubbleRow: { flexDirection: "row-reverse" },
   bubble: {
     backgroundColor: p.white,
     borderRadius: 17,
     borderTopLeftRadius: 4,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: p.border,
+    maxWidth: "85%",
+    minWidth: 0,
+    flexShrink: 1,
   },
   mine: {
     backgroundColor: p.primary,
@@ -556,7 +590,12 @@ const st = StyleSheet.create({
     borderTopRightRadius: 4,
   },
   messageText: { fontSize: 14, color: p.ink, lineHeight: 23 },
-  timestamp: { fontSize: 9, color: p.secondary, marginHorizontal: 3 },
+  timestamp: {
+    fontSize: 9,
+    color: p.secondary,
+    flexShrink: 0,
+    marginBottom: 2,
+  },
   composerWrap: {
     backgroundColor: p.white,
     paddingHorizontal: 17,

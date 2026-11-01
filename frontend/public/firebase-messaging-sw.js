@@ -3,6 +3,16 @@ self.addEventListener("notificationclick", (event) => {
   const data =
     event.notification.data?.FCM_MSG?.data ?? event.notification.data;
   if (data?.type !== "CHAT_MESSAGE" && data?.type !== "TRIP_NOTICE") return;
+  const payload = {
+    type: data.type,
+    recipientId: data.recipientId,
+    tripId: data.tripId,
+    eventId: data.eventId,
+    deliveryId: data.deliveryId,
+    ...(data.type === "CHAT_MESSAGE"
+      ? { partyId: data.partyId, messageId: data.messageId }
+      : { noticeId: data.noticeId }),
+  };
   event.stopImmediatePropagation();
   event.notification.close();
   event.waitUntil(
@@ -15,11 +25,11 @@ self.addEventListener("notificationclick", (event) => {
         (item) => new URL(item.url).origin === self.location.origin,
       );
       if (client) {
-        client.postMessage({ type: "WEGOTRIP_PUSH_OPEN", payload: data });
+        client.postMessage({ type: "WEGOTRIP_PUSH_OPEN", payload });
         await client.focus();
       } else {
         const url = new URL("/", self.location.origin);
-        url.searchParams.set("push", JSON.stringify(data));
+        url.searchParams.set("push", JSON.stringify(payload));
         await self.clients.openWindow(url.href);
       }
     })(),
