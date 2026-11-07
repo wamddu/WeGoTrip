@@ -1,0 +1,26 @@
+{
+  "path": "C:\\Programings\\2026_2_창의학기제\\output\\apk\\WeGoTrip-1.0.6.apk",
+  "version": "1.0.6",
+  "versionCode": 6,
+  "package": "com.jeongheaum.frontend",
+  "keyboardMode": "resize",
+  "androidPushConfigured": true,
+  "endpointsMatchLocalConfig": {
+    "EXPO_PUBLIC_API_URL": true,
+    "EXPO_PUBLIC_MAPS_API_URL": true
+  },
+  "bundleMarkers": {
+    "showChatMessageTime": true,
+    "sameChatMessageGroup": true,
+    "ownBubbleRow": true,
+    "pushIdentifier": true
+  },
+  "abis": [
+    "arm64-v8a",
+    "armeabi-v7a",
+    "x86",
+    "x86_64"
+  ],
+  "bytes": 114831295,
+  "sha256": "c4d1fff4086ebe096513ae1f8ed6eee257663a3f84e6b4d2a6b039a860bb082f"
+}

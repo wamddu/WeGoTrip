@@ -26,13 +26,16 @@ public class UserService {
     private final Clock clock;
     private final String consentVersion;
     private final com.travel.travelbackend.tripapi.TripService trips;
+    private final com.travel.travelbackend.tripapi.ChatService chat;
     public UserService(UserRepository users, UserSettingRepository settings, UserDeviceRepository devices,
                        UserConsentRepository consents, PasswordEncoder passwords, BankCipher bank, Clock clock,
                        @Value("${users.consent-version:1.0}") String consentVersion,
-                       com.travel.travelbackend.tripapi.TripService trips, RefreshCredentialRepository refreshCredentials) {
+                       com.travel.travelbackend.tripapi.TripService trips, RefreshCredentialRepository refreshCredentials,
+                       com.travel.travelbackend.tripapi.ChatService chat) {
         this.users = users; this.settings = settings; this.devices = devices; this.consents = consents;
         this.passwords = passwords; this.bank = bank; this.clock = clock; this.consentVersion = consentVersion;
         this.trips = trips; this.refreshCredentials = refreshCredentials;
+        this.chat = chat;
     }
     public record Created(String id, String email, String name, Instant createdAt) {}
     public record Profile(String id, String email, String name, String role, String status, String loginProvider,
@@ -124,6 +127,7 @@ public class UserService {
                 number.longValue() > now || number.longValue() < now - 300)
             throw new ApiException(403, "REAUTHENTICATION_REQUIRED", "최근 5분 이내 재인증이 필요합니다.");
         trips.withdraw(user.getId());
+        chat.revokeLocationsForUser(user.getId());
         refreshCredentials.deleteByUserId(user.getId());
         devices.deleteByUserId(user.getId());
         consents.deleteAll(consents.findByUserIdOrderByAgreedAtDescIdDesc(user.getId()));

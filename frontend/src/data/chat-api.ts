@@ -1,4 +1,5 @@
 import { UserApi } from "./user-api";
+import type { ChatLocation, LocationInput } from "./chat-location";
 
 export interface PollOption {
   id: string;
@@ -22,7 +23,7 @@ export interface ChatPoll {
 }
 export interface ChatMessage {
   id: string;
-  kind: "TEXT" | "IMAGE" | "POLL";
+  kind: "TEXT" | "IMAGE" | "POLL" | "LOCATION";
   text: string;
   authorId: string | null;
   authorName: string;
@@ -30,6 +31,7 @@ export interface ChatMessage {
   revision: string;
   imageUrl: string | null;
   poll: ChatPoll | null;
+  location?: ChatLocation | null;
 }
 export interface PollInput {
   question: string;
@@ -126,6 +128,32 @@ export class ChatApi {
     return this.api.request<ChatMessage>(this.path("polls"), "POST", input, {
       "Idempotency-Key": key,
     });
+  }
+  previewLocation(input: LocationInput) {
+    return this.api.request<{ url: string }>(
+      this.path("locations/preview"),
+      "POST",
+      input,
+    );
+  }
+  sendLocation(input: LocationInput, key: string) {
+    return this.api.request<ChatMessage>(
+      this.path("locations"),
+      "POST",
+      input,
+      { "Idempotency-Key": key },
+    );
+  }
+  locationMap(id: string) {
+    return this.api.request<{ url: string; revision: string }>(
+      this.path(`messages/${encodeURIComponent(id)}/location-map`),
+    );
+  }
+  revokeLocation(id: string) {
+    return this.api.request<ChatMessage>(
+      this.path(`messages/${encodeURIComponent(id)}/location`),
+      "DELETE",
+    );
   }
   vote(id: string, optionId: string | null, selected?: boolean) {
     return this.api.request<ChatMessage>(

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import {
@@ -40,6 +40,8 @@ import {
   showChatMessageTime,
 } from "./chat-message-group";
 import { ChatPhotoSheet } from "./chat-photo-sheet";
+import { ChatLocationCard } from "./chat-location-card";
+import { ChatLocationSheet } from "./chat-location-sheet";
 import { PollDeadlineField } from "./poll-deadline-input";
 import { usePollTimer } from "./use-poll-timer";
 import { useTrip } from "./trip-context";
@@ -153,6 +155,7 @@ function Message({
   const chat = useChatRoom();
   const mine = m.authorId === session?.user.id;
   const poll = m.poll;
+  const isLocation = m.kind === "LOCATION";
   const { closed, remaining } = usePollTimer(poll);
   const total =
     poll?.options.reduce((sum, option) => sum + option.votes, 0) ?? 0;
@@ -180,9 +183,10 @@ function Message({
           <View
             style={[
               st.bubble,
-              mine && !poll && !m.imageUrl && st.mine,
+              mine && !poll && !m.imageUrl && !isLocation && st.mine,
               !!m.imageUrl && st.imageBubble,
               poll && st.pollBubble,
+              isLocation && st.locationBubble,
             ]}
           >
             {m.imageUrl && (
@@ -199,7 +203,8 @@ function Message({
                 />
               </Pressable>
             )}
-            {!!m.text && (
+            {isLocation && <ChatLocationCard message={m} mine={mine} />}
+            {!!m.text && !isLocation && (
               <Text
                 selectable
                 style={[s.body, mine && !m.imageUrl && { color: p.white }]}
@@ -368,10 +373,12 @@ export function ChatComposer() {
 }
 function Composer() {
   const chat = useChatRoom();
-  const { trip } = useTrip();
+  const { trip, userApi } = useTrip();
   const [text, setText] = useState("");
   const [photosOpen, setPhotosOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const closeLocation = useCallback(() => setLocationOpen(false), []);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [error, setError] = useState("");
   const disabled = !!trip?.archived || chat.busy || chat.loading;
@@ -428,13 +435,35 @@ function Composer() {
           >
             <Icon name="poll" size={25} color={p.purple} />
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="내 위치"
+            accessibilityHint="현재 위치를 지도에서 확인한 뒤 채팅에 보냅니다"
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            onPress={() => {
+              Keyboard.dismiss();
+              setActionsOpen(false);
+              setLocationOpen(true);
+            }}
+            style={({ pressed }) => [
+              st.attachmentAction,
+              { backgroundColor: p.mintSoft },
+              (disabled || pressed) && { opacity: 0.5 },
+            ]}
+          >
+            <Icon name="pin" size={21} color={p.primaryDark} />
+            <Text style={st.locationActionLabel}>내 위치</Text>
+          </Pressable>
         </View>
       )}
       <View style={st.composer}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            actionsOpen ? "첨부 메뉴 닫기" : "이미지·투표 첨부 메뉴 열기"
+            actionsOpen
+              ? "첨부 메뉴 닫기"
+              : "이미지·투표·내 위치 첨부 메뉴 열기"
           }
           accessibilityState={{
             disabled,
@@ -476,6 +505,18 @@ function Composer() {
       </View>
       {pollOpen && <PollForm onClose={() => setPollOpen(false)} />}
       {photosOpen && <ChatPhotoSheet onClose={() => setPhotosOpen(false)} />}
+      {locationOpen && chat.api && userApi && !trip?.archived && (
+        <ChatLocationSheet
+          api={chat.api}
+          userApi={userApi}
+          roomName={
+            chat.parties.find((party) => party.id === chat.partyId)?.name ??
+            "전체 채팅"
+          }
+          onSend={chat.sendLocation}
+          onClose={closeLocation}
+        />
+      )}
     </View>
   );
 }
@@ -796,6 +837,7 @@ const st = StyleSheet.create({
     gap: 8,
   },
   pollBubble: { flex: 1 },
+  locationBubble: { width: 292, paddingHorizontal: 10, paddingVertical: 10 },
   mine: { backgroundColor: p.primary, borderColor: p.primary },
   imageBubble: {
     backgroundColor: "transparent",
@@ -838,6 +880,7 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  locationActionLabel: { fontSize: 9, fontWeight: "600", color: p.primaryDark },
   composer: {
     flexDirection: "row",
     alignItems: "center",

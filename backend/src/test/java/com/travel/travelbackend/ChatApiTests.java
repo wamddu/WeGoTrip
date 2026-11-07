@@ -34,7 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
     "spring.datasource.url=jdbc:h2:mem:chat-api;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
-    "spring.sql.init.schema-locations=classpath:trip-schema.sql,classpath:party-schema.sql,classpath:chat-schema.sql"
+    "spring.sql.init.schema-locations=classpath:trip-schema.sql,classpath:party-schema.sql,classpath:chat-schema.sql",
+    "GOOGLE_MAPS_STATIC_API_KEY=chat-test-display-key",
+    "GOOGLE_MAPS_URL_SIGNING_SECRET=dGVzdC1vbmx5LWtleQ"
 })
 @AutoConfigureMockMvc @ActiveProfiles("test")
 class ChatApiTests {
@@ -50,7 +52,7 @@ class ChatApiTests {
     @BeforeEach void setup() throws Exception {
         when(clock.instant()).thenAnswer(invocation->Instant.now());
         when(clock.getZone()).thenReturn(ZoneOffset.UTC);
-        for(String table:List.of("chat_poll_vote","chat_poll_option","chat_poll","chat_message","chat_image_upload","itinerary_item","saved_place","trip_party_member","trip_party","api_rate_limit","api_idempotency","trip_invite_code","trip_invitation","trip_member","trip","friendship","friend_request")) db.update("DELETE FROM "+table);
+        for(String table:List.of("chat_poll_vote","chat_poll_option","chat_poll","chat_message","chat_image_upload","itinerary_item","saved_place","trip_party_member","trip_party","api_rate_limit","api_idempotency","trip_invite_code","trip_invitation","trip_member","trip","friendship","friend_request","user_setting")) db.update("DELETE FROM "+table);
         users.deleteAll();
         a=user("a"); b=user("b"); c=user("c"); trip=newTrip();
         db.update("INSERT INTO trip_member(trip_id,user_id,joined_at) VALUES(?,?,CURRENT_TIMESTAMP)",trip,b);
@@ -76,6 +78,83 @@ class ChatApiTests {
     }
     Map<String,Object> multiplePoll() {
         return Map.of("question","어디로 갈까요?","allowMultiple",true,"options",List.of(Map.of("label","항목 1"),Map.of("label","항목 2"),Map.of("label","항목 3")));
+    }
+
+    private Map<String,Object> location(Instant capturedAt) {
+        return Map.of("latitude",37.5665,"longitude",126.978,"accuracyM",25,"capturedAt",capturedAt.toString());
+    }
+    private void allowLocation(String author) {
+        db.update("INSERT INTO user_setting(user_id,push_notification_enabled,location_sharing_enabled) VALUES(?,FALSE,TRUE)",author);
+    }
+
+    @Test void locationPreviewDoesNotPostAndPartyChatStoresOneSnapshotWithASignedMap() throws Exception {
+        allowLocation(a);
+        String party=party(List.of(a,b)), scope="?partyId="+party;
+        var input=location(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
+        var preview=create(path+"/locations/preview"+scope,a,input).andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control","no-store"));
+        String url=field(preview,"url");
+        assertTrue(url.startsWith("https://maps.googleapis.com/maps/api/staticmap?"));
+        assertTrue(url.contains("markers=color%3A0x208AEF%7C37.5665000%2C126.9780000"));
+        assertTrue(url.contains("&signature="));
+        assertFalse(url.contains("dGVzdC1vbmx5LWtleQ"));
+        assertEquals(0,count("chat_message"));assertEquals(0,count("chat_location"));
+        String key=UUID.randomUUID().toString();
+        String id=field(create(path+"/locations"+scope,a,key,input).andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.kind").value("LOCATION"))
+            .andExpect(jsonPath("$.data.location.capturedAt").value(input.get("capturedAt")))
+            .andExpect(jsonPath("$.data.location.accuracyM").value(25)),"id");
+        create(path+"/locations"+scope,a,key,input).andExpect(status().isCreated()).andExpect(jsonPath("$.data.id").value(id));
+        assertEquals(1,count("chat_message"));assertEquals(1,count("chat_location"));
+        assertEquals("{\"id\":\""+id+"\"}",db.queryForObject("SELECT response_body FROM api_idempotency WHERE operation='chat.location'",String.class));
+        mvc.perform(auth(get(path+"/messages"+scope),b)).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].location.latitude").value(37.5665));
+        mvc.perform(auth(get(path+"/messages"+scope+"&imagesOnly=true"),b)).andExpect(jsonPath("$.data.items.length()").value(0));
+        String mapPath=path+"/messages/"+id+"/location-map";
+        mvc.perform(auth(get(mapPath+scope),b)).andExpect(status().isOk()).andExpect(jsonPath("$.data.url").value(url)).andExpect(jsonPath("$.data.revision").value("0"));
+        mvc.perform(auth(get(mapPath),b)).andExpect(status().isNotFound());
+        mvc.perform(auth(get(mapPath+scope),c)).andExpect(status().isNotFound());
+        db.update("DELETE FROM trip_party_member WHERE party_id=? AND trip_member_id IN (SELECT id FROM trip_member WHERE user_id=?)",party,b);
+        mvc.perform(auth(get(mapPath+scope),b)).andExpect(status().isNotFound());
+    }
+
+    @Test void locationRequiresSharingAndFreshValidatedCoordinates() throws Exception {
+        var input=location(Instant.now());
+        create(path+"/locations/preview",a,input).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("LOCATION_SHARING_DISABLED"));
+        create(path+"/locations",a,input).andExpect(status().isForbidden());
+        allowLocation(a);
+        create(path+"/locations",a,location(Instant.now().minusSeconds(400))).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LOCATION_EXPIRED"));
+        var invalid=new HashMap<>(input);invalid.put("latitude",91);
+        create(path+"/locations",a,invalid).andExpect(status().isBadRequest());
+        invalid.put("latitude",37);invalid.put("imageUrl","https://example.invalid/forged");
+        create(path+"/locations/preview",a,invalid).andExpect(status().isBadRequest());
+        assertEquals(0,count("chat_message"));assertEquals(0,count("chat_location"));
+    }
+
+    @Test void authorCanRevokeAnArchivedLocationAndRetriesCannotRestoreCoordinates() throws Exception {
+        allowLocation(a);var input=location(Instant.now());String key=UUID.randomUUID().toString();
+        String id=field(create(path+"/locations",a,key,input).andExpect(status().isCreated()),"id");
+        String message=path+"/messages/"+id;
+        mvc.perform(auth(delete(message+"/location"),b)).andExpect(status().isForbidden());
+        db.update("UPDATE trip SET status='ARCHIVED' WHERE id=?",trip);
+        create(path+"/locations",a,input).andExpect(status().isConflict());
+        mvc.perform(auth(delete(message+"/location"),a)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.revision").value("1")).andExpect(jsonPath("$.data.location.latitude").isEmpty())
+            .andExpect(jsonPath("$.data.location.revokedAt").isNotEmpty());
+        mvc.perform(auth(delete(message+"/location"),a)).andExpect(status().isOk()).andExpect(jsonPath("$.data.revision").value("1"));
+        mvc.perform(auth(get(message+"/location-map"),b)).andExpect(status().isGone());
+        create(path+"/locations",a,key,input).andExpect(status().isCreated()).andExpect(jsonPath("$.data.id").value(id))
+            .andExpect(jsonPath("$.data.location.longitude").isEmpty());
+        assertEquals(1,count("chat_location"));
+    }
+
+    @Test void accountWithdrawalClearsCoordinatesBeforeTheAuthorIsDetached() throws Exception {
+        allowLocation(b);
+        String id=field(create(path+"/locations",b,location(Instant.now())).andExpect(status().isCreated()),"id");
+        mvc.perform(delete("/api/v1/users/me").with(jwt().jwt(j->j.subject(b).claim("tokenVersion",0)
+            .claim("auth_time",Instant.now().getEpochSecond())))).andExpect(status().isOk());
+        mvc.perform(auth(get(path+"/messages/"+id),a)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.authorId").isEmpty()).andExpect(jsonPath("$.data.location.latitude").isEmpty())
+            .andExpect(jsonPath("$.data.location.revokedAt").isNotEmpty());
     }
 
     @Test void multipleChoiceAddsOneVotePerOptionAndCountsDistinctParticipants() throws Exception {

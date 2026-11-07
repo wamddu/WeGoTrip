@@ -194,8 +194,20 @@ export function UserSettings() {
               )}
               {state.push.status === "error" && state.push.failure && (
                 <Text selectable style={s.small}>
-                  실패 단계: {({permission:"알림 권한",token:"FCM 토큰 발급",server:"서버 기기 등록",storage:"기기 정보 저장"})[state.push.failure.stage]}
-                  {" · "}{state.push.failure.code}{state.push.failure.status ? ` (HTTP ${state.push.failure.status})` : ""}
+                  실패 단계:{" "}
+                  {
+                    {
+                      permission: "알림 권한",
+                      token: "FCM 토큰 발급",
+                      server: "서버 기기 등록",
+                      storage: "기기 정보 저장",
+                    }[state.push.failure.stage]
+                  }
+                  {" · "}
+                  {state.push.failure.code}
+                  {state.push.failure.status
+                    ? ` (HTTP ${state.push.failure.status})`
+                    : ""}
                 </Text>
               )}
               {state.push.status === "error" && (
@@ -241,6 +253,10 @@ export function UserSettings() {
                   }
                 />
               </View>
+              <Text style={s.small}>
+                설정을 끄면 새 위치 공유가 중지돼요. 이미 보낸 위치는 채팅에서
+                취소할 수 있어요.
+              </Text>
             </Card>
           )}
           <Section title="약관 동의 내역" />

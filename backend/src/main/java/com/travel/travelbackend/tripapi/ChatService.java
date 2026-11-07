@@ -7,6 +7,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -19,9 +21,13 @@ public class ChatService {
     private final TripStore s;
     private final ApplicationEventPublisher events;
     private final PushQueue pushes;
+    private final StaticMapSigner maps;
+    private final TripRateLimit limits;
+    private static final String LOCATION_SELECT="SELECT m.*,l.message_id AS location_id,l.latitude AS location_latitude,l.longitude AS location_longitude,l.accuracy_m AS location_accuracy,l.captured_at AS location_captured,l.revoked_at AS location_revoked FROM chat_message m LEFT JOIN chat_location l ON l.message_id=m.id";
     public record Changed(long tripId, Long partyId, long messageId) {}
-    public ChatService(PlanningSupport p, ApplicationEventPublisher events, PushQueue pushes) {
+    public ChatService(PlanningSupport p, ApplicationEventPublisher events, PushQueue pushes, StaticMapSigner maps, TripRateLimit limits) {
         this.p=p; this.s=p.s; this.events=events;this.pushes=pushes;
+        this.maps=maps;this.limits=limits;
     }
 
     // The trip lock also serializes votes, party membership edits and archival.
@@ -39,12 +45,15 @@ public class ChatService {
         return trip;
     }
     private Map<String,Object> message(long trip, String party, long id) {
-        var row=s.one("SELECT * FROM chat_message WHERE id=? AND trip_id=? AND (party_id=? OR (party_id IS NULL AND ? IS NULL))",id,trip,party,party);
+        var row=s.one(LOCATION_SELECT+" WHERE m.id=? AND m.trip_id=? AND (m.party_id=? OR (m.party_id IS NULL AND ? IS NULL))",id,trip,party,party);
         if(row==null) throw fail(404,"MESSAGE_NOT_FOUND","메시지를 찾을 수 없어요.");
         return row;
     }
     private Object view(Map<String,Object> row, long actor) {
-        Object image=null, poll=null;
+        Object image=null, poll=null, location=null;
+        if("LOCATION".equals(str(row,"kind")) && row.get("location_id")!=null)
+            location=map("latitude",row.get("location_latitude"),"longitude",row.get("location_longitude"),"accuracyM",row.get("location_accuracy"),
+                "capturedAt",locationTime(row.get("location_captured")),"revokedAt",locationTime(row.get("location_revoked")));
         if(row.get("image_upload_id")!=null) {
             var upload=s.one("SELECT image_url FROM chat_image_upload WHERE id=?",row.get("image_upload_id"));
             if(upload!=null) image=str(upload,"image_url");
@@ -63,14 +72,14 @@ public class ChatService {
         }
         return map("id",str(row,"id"),"kind",str(row,"kind"),"text",str(row,"text"),"authorId",row.get("author_id")==null?null:str(row,"author_id"),
             "authorName",row.get("author_id")==null?"탈퇴한 사용자":s.profile(n(row,"author_id")).get("name"),"createdAt",instant(row,"created_at"),
-            "revision",str(row,"revision"),"imageUrl",image,"poll",poll);
+            "revision",str(row,"revision"),"imageUrl",image,"poll",poll,"location",location);
     }
     public Object history(Jwt jwt, String tripId, String partyId, String before, int limit, boolean imagesOnly) {
         var trip=access(jwt,tripId,partyId,false);
         if(limit<1 || limit>100) throw ApiException.invalid();
         long boundary=before==null?Long.MAX_VALUE:Inputs.id(before);
-        String filter=imagesOnly?" AND kind='IMAGE' AND image_upload_id IS NOT NULL":"";
-        var rows=s.db.queryForList("SELECT * FROM chat_message WHERE trip_id=? AND (party_id=? OR (party_id IS NULL AND ? IS NULL)) AND id<?"+filter+" ORDER BY id DESC LIMIT ?",n(trip,"id"),partyId,partyId,boundary,limit+1);
+        String filter=imagesOnly?" AND m.kind='IMAGE' AND m.image_upload_id IS NOT NULL":"";
+        var rows=s.db.queryForList(LOCATION_SELECT+" WHERE m.trip_id=? AND (m.party_id=? OR (m.party_id IS NULL AND ? IS NULL)) AND m.id<?"+filter+" ORDER BY m.id DESC LIMIT ?",n(trip,"id"),partyId,partyId,boundary,limit+1);
         boolean more=rows.size()>limit;
         var selected=new ArrayList<>(rows.subList(0,Math.min(limit,rows.size())));
         String cursor=more?str(selected.getLast(),"id"):null;
@@ -209,5 +218,91 @@ public class ChatService {
         var trip=access(jwt,tripId,partyId,true);
         long id=s.insert("INSERT INTO chat_image_upload(trip_id,party_id,author_id,public_id,image_url,created_at) VALUES(?,?,?,?,?,?)",n(trip,"id"),partyId,s.actor(jwt),publicId,url,s.now());
         return map("id",Long.toString(id),"url",url);
+    }
+
+    private record LocationInput(BigDecimal latitude, BigDecimal longitude, BigDecimal accuracy, Instant captured) {
+        Object canonical() { return map("latitude",latitude,"longitude",longitude,"accuracyM",accuracy,"capturedAt",captured.toString()); }
+    }
+    private static Instant locationTime(Object value) {
+        if(value==null) return null;
+        if(value instanceof LocalDateTime time) return time.toInstant(ZoneOffset.UTC);
+        if(value instanceof Timestamp time) return time.toLocalDateTime().toInstant(ZoneOffset.UTC);
+        throw new IllegalStateException("Unsupported location timestamp");
+    }
+    private static BigDecimal decimal(Object raw, double bound, int scale, boolean signed) {
+        if(!(raw instanceof Number number) || !Double.isFinite(number.doubleValue()) || (!signed && number.doubleValue()<0)
+            || Math.abs(number.doubleValue())>bound) throw ApiException.invalid();
+        return BigDecimal.valueOf(number.doubleValue()).setScale(scale,RoundingMode.HALF_UP);
+    }
+    private LocationInput locationInput(Map<String,Object> body) {
+        Inputs.fields(body,"latitude","longitude","accuracyM","capturedAt");
+        Instant captured;
+        try {
+            if(!(body.get("capturedAt") instanceof String value) || value.length()>64) throw new IllegalArgumentException();
+            captured=OffsetDateTime.parse(value).toInstant().truncatedTo(ChronoUnit.MICROS);
+        } catch(RuntimeException error) { throw fail(400,"INVALID_LOCATION_TIME","위치 측정 시각을 확인해 주세요."); }
+        return new LocationInput(decimal(body.get("latitude"),90,7,true),decimal(body.get("longitude"),180,7,true),
+            body.get("accuracyM")==null?null:decimal(body.get("accuracyM"),1000000,2,false),captured);
+    }
+    private void sharingAllowed(long actor, LocationInput input) {
+        var setting=s.one("SELECT location_sharing_enabled FROM user_setting WHERE user_id=?",actor);
+        if(setting==null || !(Boolean.TRUE.equals(setting.get("location_sharing_enabled")) || "1".equals(str(setting,"location_sharing_enabled"))))
+            throw fail(403,"LOCATION_SHARING_DISABLED","계정 설정에서 위치 공유를 켜 주세요.");
+        Instant now=s.clock.instant();
+        if(input.captured().isBefore(now.minusSeconds(300)) || input.captured().isAfter(now.plusSeconds(60)))
+            throw fail(400,"LOCATION_EXPIRED","위치를 다시 측정해 주세요.");
+    }
+    private void locationLimit(long actor) {
+        if(!limits.allow("chat.location:"+actor,60,120)) throw fail(429,"LOCATION_RATE_LIMIT","위치 요청이 많아요. 잠시 후 다시 시도해 주세요.");
+    }
+    public Object previewLocation(Jwt jwt,String tripId,String partyId,Map<String,Object> body) {
+        access(jwt,tripId,partyId,true);
+        var input=locationInput(body);long actor=s.actor(jwt);
+        sharingAllowed(actor,input);locationLimit(actor);
+        return map("url",maps.sign(input.latitude(),input.longitude()));
+    }
+    public Object sendLocation(Jwt jwt,String tripId,String partyId,String rawKey,Map<String,Object> body) {
+        var trip=access(jwt,tripId,partyId,false);
+        var input=locationInput(body);long actor=s.actor(jwt),tid=n(trip,"id");
+        String key=PlanningSupport.key(rawKey),digest=p.digest(tid,map("partyId",partyId,"location",input.canonical()));
+        Object replay=p.replay(actor,"chat.location",key,digest);
+        if(replay instanceof Map<?,?> saved) return view(message(tid,partyId,Inputs.id(saved.get("id"))),actor);
+        p.trips.active(trip);sharingAllowed(actor,input);maps.requireConfigured();locationLimit(actor);
+        long id=s.insert("INSERT INTO chat_message(trip_id,party_id,author_id,kind,text,created_at) VALUES(?,?,?,'LOCATION',?,?)",
+            tid,partyId,actor,"위치를 공유했어요. 최신 앱에서 지도를 확인해 주세요.",s.now());
+        s.db.update("INSERT INTO chat_location(message_id,latitude,longitude,accuracy_m,captured_at) VALUES(?,?,?,?,?)",
+            id,input.latitude(),input.longitude(),input.accuracy(),LocalDateTime.ofInstant(input.captured(),ZoneOffset.UTC));
+        p.remember(actor,"chat.location",key,digest,map("id",Long.toString(id)));
+        pushes.chat(tid,partyId==null?null:Inputs.id(partyId),actor,id);
+        events.publishEvent(new Changed(tid,partyId==null?null:Inputs.id(partyId),id));
+        return view(message(tid,partyId,id),actor);
+    }
+    public Object locationMap(Jwt jwt,String tripId,String partyId,String id) {
+        var trip=access(jwt,tripId,partyId,false);
+        var row=message(n(trip,"id"),partyId,Inputs.id(id));
+        if(!"LOCATION".equals(str(row,"kind")) || row.get("location_id")==null) throw fail(404,"LOCATION_NOT_FOUND","공유한 위치를 찾을 수 없어요.");
+        if(row.get("location_revoked")!=null) throw fail(410,"LOCATION_REVOKED","위치 공유가 취소되었어요.");
+        locationLimit(s.actor(jwt));
+        return map("url",maps.sign((BigDecimal)row.get("location_latitude"),(BigDecimal)row.get("location_longitude")),"revision",str(row,"revision"));
+    }
+    public Object revokeLocation(Jwt jwt,String tripId,String partyId,String id) {
+        var trip=access(jwt,tripId,partyId,false);long actor=s.actor(jwt);
+        var row=message(n(trip,"id"),partyId,Inputs.id(id));
+        if(!"LOCATION".equals(str(row,"kind")) || row.get("location_id")==null) throw fail(404,"LOCATION_NOT_FOUND","공유한 위치를 찾을 수 없어요.");
+        if(!Objects.equals(row.get("author_id"),actor)) throw fail(403,"FORBIDDEN","본인이 공유한 위치만 취소할 수 있어요.");
+        revokeLocationRow(row);
+        return view(message(n(trip,"id"),partyId,Inputs.id(id)),actor);
+    }
+    private void revokeLocationRow(Map<String,Object> row) {
+        long id=n(row,"id");
+        int changed=s.db.update("UPDATE chat_location SET latitude=NULL,longitude=NULL,accuracy_m=NULL,revoked_at=? WHERE message_id=? AND revoked_at IS NULL",LocalDateTime.ofInstant(s.clock.instant(),ZoneOffset.UTC),id);
+        if(changed==0) return;
+        s.db.update("UPDATE chat_message SET revision=revision+1,text=? WHERE id=?","위치 공유가 취소되었어요.",id);
+        events.publishEvent(new Changed(n(row,"trip_id"),row.get("party_id")==null?null:n(row,"party_id"),id));
+    }
+    /** Caller already holds the user and affected trip locks, before the author FK is cleared. */
+    public void revokeLocationsForUser(long user) {
+        var rows=s.db.queryForList("SELECT m.* FROM chat_message m JOIN chat_location l ON l.message_id=m.id WHERE m.author_id=? AND l.revoked_at IS NULL ORDER BY m.trip_id,m.id",user);
+        rows.forEach(this::revokeLocationRow);
     }
 }

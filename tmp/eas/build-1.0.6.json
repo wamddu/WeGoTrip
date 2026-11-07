@@ -1,0 +1,40 @@
+[
+  {
+    "id": "68d3c304-78c9-49f7-b53d-46ffec1ae7b3",
+    "status": "NEW",
+    "platform": "ANDROID",
+    "artifacts": {},
+    "fingerprint": {
+      "id": "01a19643-1237-7b5c-9ab0-633829b7268b",
+      "hash": "37d62fc5c20c6da2ef1d43fdcba03bc64f34192f"
+    },
+    "initiatingActor": {
+      "id": "200cf8e2-ea0e-4b3a-b94e-645d188c3f16",
+      "displayName": "jeongheaum"
+    },
+    "logFiles": [],
+    "app": {
+      "id": "615bd075-cc3c-4fd8-8e6a-1f1a9a90f5a4",
+      "name": "frontend",
+      "slug": "frontend",
+      "ownerAccount": {
+        "id": "06e7aef5-d110-405b-b70e-36c220689260",
+        "name": "jeongheaum"
+      }
+    },
+    "distribution": "INTERNAL",
+    "buildProfile": "preview",
+    "appIdentifier": "com.jeongheaum.frontend",
+    "sdkVersion": "57.0.0",
+    "appVersion": "1.0.6",
+    "appBuildVersion": "6",
+    "gitCommitHash": "d80d1e48750ce1026f6161b0af8644a531c303af",
+    "gitCommitMessage": "1.0.5",
+    "priority": "NORMAL",
+    "createdAt": "2026-11-01T08:39:00.303Z",
+    "updatedAt": "2026-11-01T08:39:00.303Z",
+    "expirationDate": "2026-11-15T08:39:00.396Z",
+    "isForIosSimulator": false
+  }
+]
+

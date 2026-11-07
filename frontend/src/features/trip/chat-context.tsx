@@ -18,6 +18,7 @@ import {
   type PollInput,
 } from "../../data/chat-api";
 import { ApiError } from "../../data/user-api";
+import type { LocationInput } from "../../data/chat-location";
 import { requestKey } from "../../data/trip-api";
 import { useTrip } from "./trip-context";
 
@@ -147,11 +148,13 @@ function useChatRoomState(enabled: boolean) {
           }
           setError("");
           const recent = new Set(page.items.map((m) => m.id));
-          const olderPolls = messagesRef.current.filter(
-            (m) => m.poll && !recent.has(m.id),
+          const olderEditableMessages = messagesRef.current.filter(
+            (m) =>
+              (m.poll || (m.location && !m.location.revokedAt)) &&
+              !recent.has(m.id),
           );
           await Promise.all(
-            olderPolls.map(async (m) => {
+            olderEditableMessages.map(async (m) => {
               const item = await api!.message(m.id);
               if (valid()) accept([item], generation);
             }),
@@ -245,7 +248,7 @@ function useChatRoomState(enabled: boolean) {
       }
     }
     void connect();
-    // Reconcile after outages, and refresh older visible polls as well.
+    // Reconcile after outages, including older polls and revocable locations.
     const fallback = setInterval(() => {
       if (valid() && AppState.currentState !== "background") void sync();
     }, 15000);
@@ -346,6 +349,9 @@ function useChatRoomState(enabled: boolean) {
     send: (text: string, uploadId: string | null) =>
       create("message", { text, uploadId }),
     poll: (input: PollInput) => create("poll", input),
+    sendLocation: (input: LocationInput, key: string) =>
+      write(() => api!.sendLocation(input, key)),
+    revokeLocation: (id: string) => write(() => api!.revokeLocation(id)),
     vote: (id: string, optionId: string | null, selected?: boolean) =>
       write(() => api!.vote(id, optionId, selected)),
     close: (id: string) => write(() => api!.close(id)),

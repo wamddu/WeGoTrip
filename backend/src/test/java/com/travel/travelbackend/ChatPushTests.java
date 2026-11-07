@@ -36,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties={
     "spring.datasource.url=jdbc:h2:mem:chat-push;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
     "spring.sql.init.schema-locations=classpath:trip-schema.sql,classpath:party-schema.sql,classpath:chat-schema.sql,classpath:push-schema.sql",
-    "push.enabled=true","push.worker-enabled=false"
+    "push.enabled=true","push.worker-enabled=false",
+    "GOOGLE_MAPS_STATIC_API_KEY=chat-test-display-key","GOOGLE_MAPS_URL_SIGNING_SECRET=dGVzdC1vbmx5LWtleQ"
 })
 @AutoConfigureMockMvc @ActiveProfiles("test")
 class ChatPushTests {
@@ -79,9 +80,9 @@ class ChatPushTests {
     }
     String field(ResultActions result,String name) throws Exception { return JsonPath.read(result.andReturn().getResponse().getContentAsString(),"$.data."+name); }
     int count(String table) { return db.queryForObject("SELECT COUNT(*) FROM "+table,Integer.class); }
-    void send() throws Exception { postAs(path+"/messages",a,UUID.randomUUID().toString(),Map.of("text","private text must not be in push")).andExpect(status().isCreated()); }
+    void send() throws Exception { postAs(path+"/messages",a,UUID.randomUUID().toString(),Map.of("text","새 채팅 내용")).andExpect(status().isCreated()); }
     String state() { return db.queryForObject("SELECT status FROM push_delivery ORDER BY id LIMIT 1",String.class); }
-    @Test void queuesOnlyEligibleDevicesOnceAndSendsGenericPayload() throws Exception {
+    @Test void queuesOnlyEligibleDevicesOnceAndSendsRoomAndMessagePreview() throws Exception {
         device(b,"token-b-second");
         String key=UUID.randomUUID().toString();var body=Map.of("text","secret message");
         postAs(path+"/messages",a,key,body).andExpect(status().isCreated());
@@ -93,7 +94,12 @@ class ChatPushTests {
         assertEquals(2,worker.drain());
         var payload=org.mockito.ArgumentCaptor.forClass(PushSender.Message.class);verify(sender,times(2)).send(payload.capture());
         assertEquals(Set.of("token-b","token-b-second"),new HashSet<>(payload.getAllValues().stream().map(PushSender.Message::token).toList()));
-        for(var message:payload.getAllValues()) { assertEquals(b,message.data().get("recipientId"));assertEquals(trip,message.data().get("tripId"));assertEquals("",message.data().get("partyId"));assertFalse(message.body().contains("secret"));assertEquals("CHAT_MESSAGE",message.data().get("type")); }
+        for(var message:payload.getAllValues()) {
+            assertEquals(b,message.data().get("recipientId"));assertEquals(trip,message.data().get("tripId"));
+            assertEquals("",message.data().get("partyId"));assertEquals("CHAT_MESSAGE",message.data().get("type"));
+            assertEquals("Trip · 전체 채팅",message.title());assertEquals("a: secret message",message.body());
+            assertEquals(message.title(),message.data().get("title"));assertEquals(message.body(),message.data().get("body"));
+        }
         assertEquals(0,worker.drain());assertEquals(2,db.queryForObject("SELECT COUNT(*) FROM push_delivery WHERE status='SENT'",Integer.class));
     }
     @Test void chatAndOutboxRollBackTogether() {
@@ -103,6 +109,29 @@ class ChatPushTests {
             assertEquals(1,count("push_event"));assertEquals(0,count("push_delivery"));status.setRollbackOnly();
         });
         assertEquals(0,count("chat_message"));assertEquals(0,count("push_event"));assertEquals(0,count("push_delivery"));
+    }
+    @Test void locationRetryEnqueuesOnePushWithoutCoordinatesOrMapUrl() throws Exception {
+        db.update("UPDATE user_setting SET location_sharing_enabled=TRUE WHERE user_id=?",a);
+        String key=UUID.randomUUID().toString();
+        var input=Map.of("latitude",37.5665,"longitude",126.978,"capturedAt",now.toString());
+        postAs(path+"/locations",a,key,input).andExpect(status().isCreated());
+        postAs(path+"/locations",a,key,input).andExpect(status().isCreated());
+        assertEquals(1,count("chat_location"));assertEquals(1,count("push_event"));
+        assertEquals(1,worker.drain());
+        var payload=org.mockito.ArgumentCaptor.forClass(PushSender.Message.class);verify(sender).send(payload.capture());
+        assertEquals("a: 위치를 공유했어요.",payload.getValue().body());
+        String data=payload.getValue().data().toString();
+        assertFalse(data.contains("37.5665"));assertFalse(data.contains("126.978"));assertFalse(data.contains("maps.googleapis.com"));
+    }
+    @Test void locationAndOutboxRollBackWithTheMessage() {
+        db.update("UPDATE user_setting SET location_sharing_enabled=TRUE WHERE user_id=?",a);
+        var tx=new TransactionTemplate(manager);
+        tx.executeWithoutResult(status->{
+            chat.sendLocation(Jwt.withTokenValue("test").header("alg","none").subject(a).claim("tokenVersion",0).build(),
+                trip,null,UUID.randomUUID().toString(),Map.of("latitude",37.5665,"longitude",126.978,"capturedAt",now.toString()));
+            assertEquals(1,count("chat_location"));assertEquals(1,count("push_event"));status.setRollbackOnly();
+        });
+        assertEquals(0,count("chat_message"));assertEquals(0,count("chat_location"));assertEquals(0,count("push_event"));
     }
     @Test void partyImagesAndPollsNotifyMembersButPollUpdatesDoNot() throws Exception {
         db.update("UPDATE user_setting SET push_notification_enabled=TRUE WHERE user_id=?",c);
@@ -117,6 +146,21 @@ class ChatPushTests {
         assertEquals(3,count("push_event"));assertEquals(0,count("push_delivery"));
         assertEquals(3,worker.drain());
         verify(sender,times(3)).send(argThat(message->message.data().get("partyId").equals(party)&&message.data().get("recipientId").equals(b)));
+        var payload=org.mockito.ArgumentCaptor.forClass(PushSender.Message.class);verify(sender,times(3)).send(payload.capture());
+        assertTrue(payload.getAllValues().stream().allMatch(message->message.title().equals("Trip · Party")));
+        assertEquals(Set.of("a: party","a: 사진을 보냈어요.","a: 투표: Where?"),
+            new HashSet<>(payload.getAllValues().stream().map(PushSender.Message::body).toList()));
+        assertTrue(payload.getAllValues().stream().noneMatch(message->message.body().contains("cloudinary")));
+    }
+    @Test void previewsNormalizeWhitespaceAndTruncateWithoutSplittingEmoji() throws Exception {
+        postAs(path+"/messages",a,UUID.randomUUID().toString(),Map.of("text","  안녕\n\t"+"😀".repeat(200))).andExpect(status().isCreated());
+        assertEquals(1,worker.drain());
+        var payload=org.mockito.ArgumentCaptor.forClass(PushSender.Message.class);verify(sender).send(payload.capture());
+        String body=payload.getValue().body();
+        assertTrue(body.startsWith("a: 안녕 😀"));assertTrue(body.endsWith("…"));assertFalse(body.contains("\n"));
+        assertEquals(183,body.codePointCount(0,body.length()));
+        assertFalse(body.contains("\uFFFD"));
+        assertEquals(body,payload.getValue().data().get("body"));
     }
     @Test void changedSettingsMembershipAndTokensAreRecheckedBeforeSend() throws Exception {
         send();db.update("UPDATE user_setting SET push_notification_enabled=FALSE WHERE user_id=?",b);

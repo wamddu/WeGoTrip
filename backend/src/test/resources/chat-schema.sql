@@ -35,6 +35,21 @@ CREATE TABLE chat_message (
  FOREIGN KEY (image_upload_id) REFERENCES chat_image_upload(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_chat_history ON chat_message(trip_id, party_id, id);
+CREATE TABLE chat_location (
+ message_id BIGINT NOT NULL PRIMARY KEY,
+ latitude DECIMAL(10,7) NULL,
+ longitude DECIMAL(10,7) NULL,
+ accuracy_m DECIMAL(10,2) NULL,
+ captured_at DATETIME(6) NOT NULL,
+ revoked_at DATETIME(6) NULL,
+ CONSTRAINT fk_chat_location_message FOREIGN KEY(message_id) REFERENCES chat_message(id) ON DELETE CASCADE,
+ CONSTRAINT ck_chat_location_state CHECK (
+   (revoked_at IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL
+    AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180
+    AND (accuracy_m IS NULL OR accuracy_m >= 0))
+   OR (revoked_at IS NOT NULL AND latitude IS NULL AND longitude IS NULL AND accuracy_m IS NULL)
+ )
+);
 CREATE TABLE chat_poll (
  id BIGINT AUTO_INCREMENT PRIMARY KEY,
  message_id BIGINT NOT NULL UNIQUE,

@@ -35,6 +35,22 @@ public class ChatController {
         @RequestParam(required=false) String partyId, @RequestHeader(value="Idempotency-Key",required=false) String key, @RequestBody Map<String,Object> body) {
         return result(201,chat.createPoll(jwt,tripId,partyId,key,body));
     }
+    @PostMapping("/locations/preview") public Object previewLocation(@AuthenticationPrincipal Jwt jwt,@PathVariable String tripId,
+        @RequestParam(required=false) String partyId,@RequestBody Map<String,Object> body) {
+        return result(200,chat.previewLocation(jwt,tripId,partyId,body));
+    }
+    @PostMapping("/locations") public Object location(@AuthenticationPrincipal Jwt jwt,@PathVariable String tripId,
+        @RequestParam(required=false) String partyId,@RequestHeader(value="Idempotency-Key",required=false) String key,@RequestBody Map<String,Object> body) {
+        return result(201,chat.sendLocation(jwt,tripId,partyId,key,body));
+    }
+    @GetMapping("/messages/{id}/location-map") public Object locationMap(@AuthenticationPrincipal Jwt jwt,@PathVariable String tripId,
+        @RequestParam(required=false) String partyId,@PathVariable String id) {
+        return result(200,chat.locationMap(jwt,tripId,partyId,id));
+    }
+    @DeleteMapping("/messages/{id}/location") public Object revokeLocation(@AuthenticationPrincipal Jwt jwt,@PathVariable String tripId,
+        @RequestParam(required=false) String partyId,@PathVariable String id) {
+        return result(200,chat.revokeLocation(jwt,tripId,partyId,id));
+    }
     @PutMapping("/polls/{id}/vote") public Object vote(@AuthenticationPrincipal Jwt jwt, @PathVariable String tripId,
         @RequestParam(required=false) String partyId, @PathVariable String id, @RequestBody Map<String,Object> body) {
         return result(200,chat.changePoll(jwt,tripId,partyId,id,body,false));

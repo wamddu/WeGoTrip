@@ -1,0 +1,10 @@
+import { chromium } from 'file:///C:/Users/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import {pathToFileURL} from 'node:url';
+const base='C:/Programings/2026_2_창의학기제/output/presentations/WeGoTrip_Week8/WeGoTrip_8주차_서버배포_APK테스트';
+const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:810}});
+await page.goto(pathToFileURL(base+'.html').href);
+await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('.slide img')].map(i=>i.decode()));});
+await page.emulateMedia({media:'print'});
+await page.pdf({path:base+'.pdf',preferCSSPageSize:true,printBackground:true});
+console.log('PDF created');await browser.close();

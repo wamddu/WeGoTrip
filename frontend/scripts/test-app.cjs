@@ -14,6 +14,110 @@ require.extensions[".ts"] = (module, filename) => {
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+test("location snapshots keep the device measurement time and reject stale or invalid fixes", () => {
+  const {
+    locationInput,
+    mapsLocationUrl,
+    LOCATION_MAX_AGE_MS,
+  } = require("../src/data/chat-location.ts");
+  const now = Date.parse("2026-11-07T05:33:00Z");
+  const captured = now - 20_000;
+  const point = {
+    latitude: 37.566512345,
+    longitude: 126.978,
+    accuracy: 25.432,
+  };
+  const snapshot = locationInput(point, captured, now);
+  assert.deepEqual(snapshot, {
+    latitude: 37.5665123,
+    longitude: 126.978,
+    accuracyM: 25.43,
+    capturedAt: new Date(captured).toISOString(),
+  });
+  assert.throws(
+    () => locationInput(point, now - LOCATION_MAX_AGE_MS, now),
+    /최근 위치/,
+  );
+  assert.throws(
+    () => locationInput({ ...point, longitude: Infinity }, captured, now),
+    /좌표/,
+  );
+  assert.equal(
+    new URL(
+      mapsLocationUrl(snapshot.latitude, snapshot.longitude),
+    ).searchParams.get("query"),
+    "37.5665123,126.978",
+  );
+});
+
+test("canceling a location fix ignores the late OS result", async () => {
+  const { waitForLocation } = require("../src/data/chat-location.ts");
+  const controller = new AbortController();
+  let deliver;
+  const source = new Promise((resolve) => {
+    deliver = resolve;
+  });
+  const pending = waitForLocation(source, controller.signal);
+  controller.abort();
+  deliver({ coords: { latitude: 37, longitude: 127 } });
+  await assert.rejects(pending, /취소/);
+});
+
+test("chat location endpoints preserve party scope, and an older message cannot restore a revoked location", async () => {
+  const { ChatApi, mergeMessages } = require("../src/data/chat-api.ts");
+  const requests = [];
+  const api = new ChatApi(
+    {
+      request(...args) {
+        requests.push(args);
+        return Promise.resolve({});
+      },
+    },
+    "12",
+    "34",
+  );
+  const input = {
+    latitude: 37,
+    longitude: 127,
+    accuracyM: null,
+    capturedAt: "2026-11-07T05:33:00Z",
+  };
+  await api.previewLocation(input);
+  await api.sendLocation(input, "same-attempt-key");
+  await api.sendLocation(input, "same-attempt-key");
+  await api.locationMap("56");
+  await api.revokeLocation("56");
+  assert.deepEqual(
+    requests.map(([path]) => path),
+    [
+      "/trips/12/chat/locations/preview?partyId=34",
+      "/trips/12/chat/locations?partyId=34",
+      "/trips/12/chat/locations?partyId=34",
+      "/trips/12/chat/messages/56/location-map?partyId=34",
+      "/trips/12/chat/messages/56/location?partyId=34",
+    ],
+  );
+  assert.deepEqual(requests[1], requests[2]);
+  assert.equal(requests[4][1], "DELETE");
+  const shared = {
+    id: "56",
+    kind: "LOCATION",
+    revision: "0",
+    location: { ...input, revokedAt: null },
+  };
+  const revoked = {
+    ...shared,
+    revision: "1",
+    location: {
+      ...input,
+      latitude: null,
+      longitude: null,
+      revokedAt: "2026-11-07T05:34:00Z",
+    },
+  };
+  assert.deepEqual(mergeMessages([revoked], [shared]), [revoked]);
+});
+
 test("Buttons explicitly re-enable Android touch targets after disabled and loading states", () => {
   const filename = require.resolve("../src/ui/components.tsx");
   const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {

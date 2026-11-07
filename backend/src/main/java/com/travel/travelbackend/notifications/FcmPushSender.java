@@ -35,16 +35,7 @@ public class FcmPushSender implements PushSender {
     public Result send(PushSender.Message message) {
         if(app==null) return new Result(Status.RETRY,"SENDER_UNAVAILABLE",60);
         try {
-            var android=AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).setTtl(message.ttlMillis())
-                .setNotification(AndroidNotification.builder().setChannelId("default").setSound("default")
-                    .setTag("TRIP_NOTICE".equals(message.data().get("type"))?"notice-"+message.data().get("noticeId"):"chat-"+message.data().get("tripId")+"-"+message.data().get("partyId")).build()).build();
-            var request=com.google.firebase.messaging.Message.builder().setToken(message.token())
-                .setNotification(Notification.builder().setTitle(message.title()).setBody(message.body()).build())
-                .putAllData(message.data()).setAndroidConfig(android)
-                .setApnsConfig(ApnsConfig.builder().putHeader("apns-expiration",Long.toString((System.currentTimeMillis()+message.ttlMillis())/1000))
-                    .setAps(Aps.builder().setSound("default").build()).build())
-                .setWebpushConfig(WebpushConfig.builder().putHeader("TTL",Long.toString(Math.max(1,message.ttlMillis()/1000))).build()).build();
-            FirebaseMessaging.getInstance(app).send(request);
+            FirebaseMessaging.getInstance(app).send(request(message));
             return Result.accepted();
         } catch(FirebaseMessagingException error) {
             var code=error.getMessagingErrorCode();
@@ -53,6 +44,21 @@ public class FcmPushSender implements PushSender {
             if(code==MessagingErrorCode.INVALID_ARGUMENT || code==MessagingErrorCode.SENDER_ID_MISMATCH) return new Result(Status.FAILED,name,0);
             return new Result(Status.RETRY,name,code==MessagingErrorCode.QUOTA_EXCEEDED?60:15);
         }
+    }
+    static com.google.firebase.messaging.Message request(PushSender.Message message) {
+        var data=message.data();
+        String tag="TRIP_NOTICE".equals(data.get("type"))
+            ?"notice-"+data.get("recipientId")+"-"+data.get("noticeId")
+            :"chat-"+data.get("recipientId")+"-"+data.get("tripId")+"-"+(data.get("partyId").isEmpty()?"all":data.get("partyId"));
+        var android=AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).setTtl(message.ttlMillis())
+            .setNotification(AndroidNotification.builder().setChannelId("default").setSound("default").setTag(tag).build()).build();
+        return com.google.firebase.messaging.Message.builder().setToken(message.token())
+            .setNotification(Notification.builder().setTitle(message.title()).setBody(message.body()).build())
+            .putAllData(data).setAndroidConfig(android)
+            .setApnsConfig(ApnsConfig.builder().putHeader("apns-expiration",Long.toString((System.currentTimeMillis()+message.ttlMillis())/1000))
+                .setAps(Aps.builder().setSound("default").setThreadId(tag).build()).build())
+            .setWebpushConfig(WebpushConfig.builder().putHeader("TTL",Long.toString(Math.max(1,message.ttlMillis()/1000)))
+                .setNotification(WebpushNotification.builder().setTag(tag).build()).build()).build();
     }
     @PreDestroy public void close() { if(app!=null) app.delete(); }
 }
